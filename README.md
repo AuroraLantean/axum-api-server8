@@ -26,5 +26,7 @@ cargo install cargo-watch
 
 ## Run
 Start Terminator: `just term`
+
 Run the server: `just watch`
+
 Start Slumber to make requests: `just httpclient`

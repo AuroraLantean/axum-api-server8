@@ -6,6 +6,7 @@ use axum::{
   routing::{delete, get, patch, post, put},
 };
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
@@ -21,15 +22,14 @@ async fn main() {
 
 fn router() -> Router {
   Router::new()
-    // `GET /` goes to `root`
     .route("/", get(root))
     .route("/", post(post_handler))
-  //.route("/users", post(create_user))
+    .route("/users", post(create_user))
 }
-// basic handler that responds with a static string
 async fn root() -> &'static str {
   "Hello Root!"
 }
+
 async fn post_handler() -> Response {
   Response::builder()
     .status(StatusCode::CREATED)
@@ -39,30 +39,23 @@ async fn post_handler() -> Response {
   //(StatusCode::CREATED, "New Post Added!")
 } //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
 
-//#[derive(Serialize)]
-struct User {
-  id: u64,
-  username: String,
-}
-/*async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json<CreateUser>,
-) -> (StatusCode, Json<User>) {
-    // insert your application logic here
-    let user = User {
-        id: 1337,
-        username: payload.username,
-    };
-
-    // this will be converted into a JSON response
-    // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
+async fn create_user(Json(payload): Json<CreateUser>) -> (StatusCode, Json<User>) {
+  let user = User {
+    id: 1337, //id: Uuid::new_v4(),
+    username: payload.username,
+  };
+  //db.write().unwrap().insert(user.id, user.clone());
+  (StatusCode::CREATED, Json(user)) //Code = `201 Created`
 }
 
 // the input to our `create_user` handler
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CreateUser {
-    username: String,
+  username: String,
 }
-*/
+#[derive(Debug, Serialize, Clone)]
+struct User {
+  id: u64,
+  //id: Uuid,
+  username: String,
+}
