@@ -8,7 +8,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 mod handlers;
-use handlers::{add_user, post_handler, read_user, root};
+use handlers::{add_user, delete_user, post_handler, read_user, root, update_user};
 
 #[tokio::main]
 async fn main() {
@@ -27,5 +27,8 @@ fn router() -> Router {
     .route("/", get(root))
     .route("/", post(post_handler))
     .route("/users", post(add_user))
-    .route("/users/{id}", get(read_user))
+    .route(
+      "/users/{id}",
+      get(read_user).patch(update_user).delete(delete_user),
+    )
 }
