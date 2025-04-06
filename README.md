@@ -1,6 +1,17 @@
 # axum-api-server8
 
 ## TODO
+https://github.com/tokio-rs/axum
+
+Build a CRUD REST API with Rust Axum | Tutorial
+https://www.youtube.com/watch?v=NJsTgmayHZY&t=21s
+
+Rust Axum Full Course - Web Development (GitHub repo updated to Axum 0.7)
+https://www.youtube.com/watch?v=XZtlD_m59sM
+
+Brook Build: Updating the Axum course to v0.8.1
+https://www.youtube.com/watch?v=JCPKGYD3vJk&list=PLrmY5pVcnuE-_CP7XZ_44HN-mDrLQV4nS&index=64
+
 Tutorials:
 https://github.com/tokio-rs/axum/blob/main/ECOSYSTEM.md#tutorials
 
@@ -10,8 +21,11 @@ https://spacedimp.com/blog/using-rust-axum-postgresql-and-tokio-to-build-a-blog/
 Rust Axum Full Course: 
 https://www.youtube.com/watch?v=XZtlD_m59sM
 
-Brook Build: Updating the Axum course to v0.8.1
-https://www.youtube.com/watch?v=JCPKGYD3vJk&list=PLrmY5pVcnuE-_CP7XZ_44HN-mDrLQV4nS&index=64
+Tonic makes gRPC in Rust stupidly simple
+https://www.youtube.com/watch?v=kerKXChDmsE
+
+Socket.io Socketioxide
+https://www.youtube.com/watch?v=HEhhWL1oUTM
 
 Deployment with Shuttle
 https://docs.shuttle.dev/examples/axum
