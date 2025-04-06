@@ -1,7 +1,7 @@
 use axum::{
   Json, Router,
   body::Body,
-  extract::Path,
+  extract::{Path, Query},
   http::StatusCode,
   response::{IntoResponse, Response},
   routing::{delete, get, patch, post, put},
@@ -39,6 +39,30 @@ pub async fn read_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   println!("{:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct Pagination {
+  pub offset: Option<usize>,
+  pub limit: Option<usize>,
+}
+
+//{{host}}/users?offset=1&limit=100
+pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> */) {
+  //let todos = db.read().unwrap();
+  println!("pagination.offset: {:?}", pagination.offset.unwrap_or(0));
+  println!(
+    "pagination.limit: {:?}",
+    pagination.limit.unwrap_or(usize::MAX)
+  );
+  /*let todos = todos
+      .values()
+      .skip(pagination.offset.unwrap_or(0))
+      .take(pagination.limit.unwrap_or(usize::MAX))
+      .cloned()
+      .collect::<Vec<_>>();
+
+  Json(todos)*/
 }
 
 pub async fn update_user(
@@ -92,7 +116,7 @@ pub struct UpdateUser {
 }
 #[derive(Debug, Serialize, Clone)]
 pub struct User {
-  id: u64, // Uuid,
-  username: String,
-  balance: u64,
+  pub id: u64, // Uuid,
+  pub username: String,
+  pub balance: u64,
 }
