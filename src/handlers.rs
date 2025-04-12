@@ -1,17 +1,28 @@
 use axum::{
-  Json, Router,
+  Json,
   body::Body,
   extract::{Path, Query},
   http::StatusCode,
-  response::{IntoResponse, Response},
-  routing::{delete, get, patch, post, put},
-};
+  response::{Html, IntoResponse, Response},
+}; //IntoResponse
 use serde::{Deserialize, Serialize};
 
 pub async fn root() -> &'static str {
   "Hello Root!"
 }
-pub async fn post_handler() -> Response {
+pub async fn html_hello() -> Html<&'static str> {
+  Html("<h1>Hello, World!</h1>")
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Params {
+  pub user_id: u32,
+  pub team_id: u32,
+}
+pub async fn customized_path(Path(params): Path<Params>) -> impl IntoResponse {
+  axum::Json(params)
+}
+pub async fn post_raw1() -> Response {
   Response::builder()
     .status(StatusCode::CREATED)
     .header("Content-Type", "application/json")
@@ -43,6 +54,7 @@ pub async fn read_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
 
 #[derive(Debug, Deserialize, Default)]
 pub struct Pagination {
+  //#[serde(default, deserialize_with = "empty_string_as_none")]
   pub offset: Option<usize>,
   pub limit: Option<usize>,
 }

@@ -1,14 +1,13 @@
 use axum::{
-  Json, Router,
-  body::Body,
-  http::StatusCode,
-  response::{IntoResponse, Response},
-  routing::{delete, get, patch, post, put},
+  Router,
+  routing::{get, post},
 };
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+//use uuid::Uuid;
 mod handlers;
-use handlers::{add_user, delete_user, post_handler, query_users, read_user, root, update_user};
+use handlers::{
+  add_user, customized_path, delete_user, html_hello, post_raw1, query_users, read_user, root,
+  update_user,
+};
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +24,9 @@ async fn main() {
 fn router() -> Router {
   Router::new()
     .route("/", get(root))
-    .route("/", post(post_handler))
+    .route("/hello", get(html_hello))
+    .route("/users/{user_id}/teams/{team_id}", get(customized_path))
+    .route("/", post(post_raw1))
     .route("/users", get(query_users).post(add_user))
     .route(
       "/users/{id}",

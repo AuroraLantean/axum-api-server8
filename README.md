@@ -3,6 +3,60 @@
 ## TODO
 https://github.com/tokio-rs/axum
 
+routes-and-handlers-close-together
+query-params-with-empty-strings
+customize-path-rejection
+get header request-id
+stream_reqwest_response(reqwest-response)
+parse-body-based-on-content-type(application/json or application/x-www-form-urlencoded)
+
+anyhow-error-response
+customize-extractor-error
+handle-head-request
+global-404-handler
+
+form, cors, jwt
+consume-body-in-extractor-or-middleware
+
+error-handling
+print-request-response
+tracing-aka-logging
+tls-graceful-shutdown
+
+PostgreSQL
+https://github.com/sfackler/rust-postgres
+https://medium.com/@mikecode/rust-how-to-connect-to-postgresql-f39ba1497b2a
+diesel-postgrestodo, diesel-async-postgres
+tokio-postgres,
+sqlx-postgres
+
+auto-reload
+testing
+dependency-injection
+
+Tutorials
+https://github.com/tokio-rs/axum/blob/main/ECOSYSTEM.md#tutorials
+
+Neon Postgres https://neon.tech/docs/guides/rust
+Shuttle Postgres https://docs.shuttle.dev/resources/shuttle-shared-db
+Render https://render.com/docs/deploy-rocket-rust
+
+Other POstgres Hosts
+https://medium.com/@nile.bits/top-10-affordable-options-to-host-your-postgresql-database-6cf103fe40b4
+
+
+JWT, Socket, gRPC
+Socketioxide: Socket.io implementation in Rust
+I never thought I'd use Socket.io ever again https://www.youtube.com/watch?v=HEhhWL1oUTM
+
+Websockets | Rust | long lived Connections 
+https://www.youtube.com/watch?v=u4gV9nYEi_I
+Real-Time P2P File Transfer App with Rust(Axum), WebSockets & Next.js 
+https://www.youtube.com/watch?v=EYwqo3CMGsU
+
+Tonic makes gRPC in Rust stupidly simple
+https://www.youtube.com/watch?v=kerKXChDmsE
+
 Build a CRUD REST API with Rust Axum | Tutorial
 https://www.youtube.com/watch?v=NJsTgmayHZY&t=21s
 
