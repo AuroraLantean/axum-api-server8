@@ -3,22 +3,22 @@
 ## TODO
 https://github.com/tokio-rs/axum
 
-routes-and-handlers-close-together
 query-params-with-empty-strings
 customize-path-rejection
 get header request-id
 stream_reqwest_response(reqwest-response)
 parse-body-based-on-content-type(application/json or application/x-www-form-urlencoded)
+routes-and-handlers-close-together
 
-anyhow-error-response
+//anyhow-error-response
 customize-extractor-error
 handle-head-request
 global-404-handler
+error-handling
 
 form, cors, jwt
 consume-body-in-extractor-or-middleware
 
-error-handling
 print-request-response
 tracing-aka-logging
 tls-graceful-shutdown

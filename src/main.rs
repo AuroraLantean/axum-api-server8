@@ -5,8 +5,8 @@ use axum::{
 //use uuid::Uuid;
 mod handlers;
 use handlers::{
-  add_user, customized_path, delete_user, html_hello, post_raw1, query_users, read_user, root,
-  update_user,
+  add_user, custom_extractor, custom_extractor2, customized_path, delete_user, html_hello,
+  internal_error, post_raw1, query_users, read_user, root, update_user,
 };
 
 #[tokio::main]
@@ -32,4 +32,7 @@ fn router() -> Router {
       "/users/{id}",
       get(read_user).patch(update_user).delete(delete_user),
     )
+    .route("/custom_extractor", post(custom_extractor))
+    .route("/custom_extractor2", post(custom_extractor2))
+    .route("/internal_error", get(internal_error))
 }
