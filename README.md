@@ -1,5 +1,16 @@
 # axum-api-server8
 
+## Postgres Setup
+```
+$ docker volume create postgres1-data
+$ docker run --name postgres1 -e POSTGRES_PASSWORD=password -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
+$ docker ps -a
+
+$ docker stop postgres1
+$ docker rm postgres1
+$ docker ps -a
+```
+
 ## TODO
 https://github.com/tokio-rs/axum
 

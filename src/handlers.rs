@@ -32,17 +32,22 @@ pub async fn post_raw1() -> Response {
   //(StatusCode::CREATED, "New Post Added!")
 } //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
 
-pub async fn add_user(Json(payload): Json<AddUser>) -> (StatusCode, Json<User>) {
+#[derive(Debug, Deserialize)]
+pub struct AddUser {
+  username: String,
+  balance: u64,
+}
+pub async fn add_user(Json(input): Json<AddUser>) -> (StatusCode, Json<User>) {
   let user = User {
     id: 1337, //id: Uuid::new_v4(),
-    username: payload.username,
-    balance: payload.balance,
+    username: input.username,
+    balance: input.balance,
   };
   println!("{:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
   (StatusCode::CREATED, Json(user)) //Code = `201 Created`
 }
-pub async fn read_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
+pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
     id: id.parse::<u64>().unwrap(),
     username: String::from("JohnDoe"),
@@ -53,13 +58,15 @@ pub async fn read_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
 
+pub async fn list_users() -> (StatusCode, Json<Value>) {
+  (StatusCode::FOUND, Json(user))
+}
 #[derive(Debug, Deserialize, Default)]
 pub struct Pagination {
   //#[serde(default, deserialize_with = "empty_string_as_none")]
   pub offset: Option<usize>,
   pub limit: Option<usize>,
 }
-
 //{{host}}/users?offset=1&limit=100
 pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> */) {
   //let todos = db.read().unwrap();
@@ -78,6 +85,11 @@ pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> 
   Json(todos)*/
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateUser {
+  username: Option<String>,
+  balance: Option<u64>,
+}
 pub async fn update_user(
   Path(id): Path<String>,
   Json(input): Json<UpdateUser>,
@@ -97,7 +109,7 @@ pub async fn update_user(
   }
   println!("new user: {:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::FOUND, Json(user)) //Code = `201 Created`
+  (StatusCode::OK, Json(user)) //Code = `201 Created`
 }
 
 pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
@@ -135,17 +147,7 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
   axum::Json(payload)
   //Json(dbg!(value));
 }
-// the input to our `add_user` handler
-#[derive(Debug, Deserialize)]
-pub struct AddUser {
-  username: String,
-  balance: u64,
-}
-#[derive(Debug, Deserialize)]
-pub struct UpdateUser {
-  username: Option<String>,
-  balance: Option<u64>,
-}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct User {
   pub id: u64, // Uuid,
