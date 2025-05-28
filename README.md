@@ -6,6 +6,17 @@ $ docker volume create postgres1-data
 $ docker run --name postgres1 -e POSTGRES_PASSWORD=password -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
 $ docker ps -a
 
+// Add table inside Docker Postgres one line at a time
+$ docker exec -it postgres1 psql -U postgres
+postgres=# CREATE TABLE users(
+id SERIAL PRIMARY KEY,
+name VARCHAR(255),
+occupation VARCHAR(255),
+email VARCHAR(255),
+phone VARCHAR(20)
+);
+postgres=# \q
+
 $ docker stop postgres1
 $ docker rm postgres1
 $ docker ps -a
@@ -96,7 +107,7 @@ Deployment with Shuttle
 https://docs.shuttle.dev/examples/axum
 
 ## Installation
-rustc 1.85.1 (4eb161250 2025-03-15)
+rustc 1.87.0 (17067e9ac 2025-05-09)
 
 ```
 cargo add axum tokio --features tokio/full

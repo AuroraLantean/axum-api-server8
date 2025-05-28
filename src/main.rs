@@ -8,6 +8,7 @@ use handlers::{
   add_user, custom_extractor, custom_extractor2, customized_path, delete_user, get_user,
   html_hello, internal_error, post_raw1, query_users, root, update_user,
 };
+mod model;
 
 #[tokio::main]
 async fn main() {

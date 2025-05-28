@@ -8,6 +8,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::model::User;
+
 pub async fn root() -> &'static str {
   "Hello Root!"
 }
@@ -34,13 +36,19 @@ pub async fn post_raw1() -> Response {
 
 #[derive(Debug, Deserialize)]
 pub struct AddUser {
-  username: String,
-  balance: u64,
+  pub name: String,
+  pub occupation: String,
+  pub email: String,
+  pub phone: String,
+  pub balance: i32,
 }
 pub async fn add_user(Json(input): Json<AddUser>) -> (StatusCode, Json<User>) {
   let user = User {
     id: 1337, //id: Uuid::new_v4(),
-    username: input.username,
+    name: input.name,
+    occupation: input.occupation,
+    email: input.email,
+    phone: input.phone,
     balance: input.balance,
   };
   println!("{:?}", user);
@@ -49,8 +57,11 @@ pub async fn add_user(Json(input): Json<AddUser>) -> (StatusCode, Json<User>) {
 }
 pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<u64>().unwrap(),
-    username: String::from("JohnDoe"),
+    id: id.parse::<i32>().unwrap(),
+    name: String::from("JohnDoe"),
+    occupation: String::from("developer"),
+    email: String::from("john@crypto.com"),
+    phone: String::from("1234"),
     balance: 1000,
   };
   println!("{:?}", user);
@@ -59,7 +70,7 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
 }
 
 pub async fn list_users() -> (StatusCode, Json<Value>) {
-  (StatusCode::FOUND, Json(user))
+  (StatusCode::FOUND, Json(Value::Null))
 }
 #[derive(Debug, Deserialize, Default)]
 pub struct Pagination {
@@ -87,7 +98,7 @@ pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> 
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateUser {
-  username: Option<String>,
+  name: Option<String>,
   balance: Option<u64>,
 }
 pub async fn update_user(
@@ -95,17 +106,20 @@ pub async fn update_user(
   Json(input): Json<UpdateUser>,
 ) -> (StatusCode, Json<User>) {
   let mut user = User {
-    id: id.parse::<u64>().unwrap(),
-    username: String::from("JohnDoe"),
+    id: id.parse::<i32>().unwrap(),
+    name: String::from("JohnDoe"),
+    occupation: String::from("developer"),
+    email: String::from("john@crypto.com"),
+    phone: String::from("1234"),
     balance: 1000,
   };
   println!("old user: {:?}", user);
 
-  if let Some(text) = input.username {
-    user.username = text;
+  if let Some(text) = input.name {
+    user.name = text;
   }
   if let Some(balance) = input.balance {
-    user.balance = balance;
+    user.balance = i32::try_from(balance).expect("msg");
   }
   println!("new user: {:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
@@ -114,8 +128,11 @@ pub async fn update_user(
 
 pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<u64>().unwrap(),
-    username: String::from("JohnDoe"),
+    id: id.parse::<i32>().unwrap(),
+    name: String::from("JohnDoe"),
+    occupation: String::from("developer"),
+    email: String::from("john@crypto.com"),
+    phone: String::from("1234"),
     balance: 1000,
   };
   println!("old user: {:?}", user);
@@ -148,12 +165,6 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
   //Json(dbg!(value));
 }
 
-#[derive(Debug, Serialize, Clone)]
-pub struct User {
-  pub id: u64, // Uuid,
-  pub username: String,
-  pub balance: u64,
-}
 #[derive(Debug, Serialize, Clone)]
 pub struct Error {
   pub code: u64, // Uuid,
