@@ -11,9 +11,9 @@ use serde_json::{Value, json};
 use crate::model::User;
 
 pub async fn root() -> &'static str {
-  "Hello Root!"
+  "Root!"
 }
-pub async fn html_hello() -> Html<&'static str> {
+pub async fn html() -> Html<&'static str> {
   Html("<h1>Hello, World!</h1>")
 }
 
@@ -30,7 +30,7 @@ pub async fn post_raw1() -> Response {
     .status(StatusCode::CREATED)
     .header("Content-Type", "application/json")
     .body(Body::from(r#"{"name":"john"}"#))
-    .unwrap()
+    .expect("response builder")
   //(StatusCode::CREATED, "New Post Added!")
 } //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
 
@@ -57,7 +57,7 @@ pub async fn add_user(Json(input): Json<AddUser>) -> (StatusCode, Json<User>) {
 }
 pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<i32>().unwrap(),
+    id: id.parse::<i32>().expect("id"),
     name: String::from("JohnDoe"),
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),
@@ -96,17 +96,36 @@ pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> 
   Json(todos)*/
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateUser {
-  name: Option<String>,
-  balance: Option<u64>,
-}
-pub async fn update_user(
+pub async fn put_user(
   Path(id): Path<String>,
-  Json(input): Json<UpdateUser>,
+  Json(input): Json<AddUser>,
+) -> (StatusCode, Json<User>) {
+  let user = User {
+    id: id.parse::<i32>().expect("id"),
+    name: input.name,
+    occupation: String::from("developer"),
+    email: input.email,
+    phone: input.phone,
+    balance: input.balance,
+  };
+  println!("new user: {:?}", user);
+  //db.write().unwrap().insert(user.id, user.clone());
+  (StatusCode::OK, Json(user)) //Code = `201 Created`
+}
+#[derive(Debug, Deserialize)]
+pub struct PatchUser {
+  pub name: Option<String>,
+  pub occupation: Option<String>,
+  pub email: Option<String>,
+  pub phone: Option<String>,
+  pub balance: Option<i32>,
+}
+pub async fn patch_user(
+  Path(id): Path<String>,
+  Json(input): Json<PatchUser>,
 ) -> (StatusCode, Json<User>) {
   let mut user = User {
-    id: id.parse::<i32>().unwrap(),
+    id: id.parse::<i32>().expect("id"),
     name: String::from("JohnDoe"),
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),
@@ -114,21 +133,27 @@ pub async fn update_user(
     balance: 1000,
   };
   println!("old user: {:?}", user);
-
-  if let Some(text) = input.name {
-    user.name = text;
+  if let Some(name) = input.name {
+    user.name = name;
+  }
+  if let Some(occupation) = input.occupation {
+    user.occupation = occupation;
+  }
+  if let Some(email) = input.email {
+    user.email = email;
+  }
+  if let Some(phone) = input.phone {
+    user.phone = phone;
   }
   if let Some(balance) = input.balance {
     user.balance = i32::try_from(balance).expect("msg");
   }
   println!("new user: {:?}", user);
-  //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::OK, Json(user)) //Code = `201 Created`
+  (StatusCode::OK, Json(user))
 }
-
 pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<i32>().unwrap(),
+    id: id.parse::<i32>().expect("id"),
     name: String::from("JohnDoe"),
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),

@@ -5,11 +5,14 @@ use axum::{
 //use uuid::Uuid;
 mod handlers;
 use handlers::{
-  add_user, custom_extractor, custom_extractor2, customized_path, delete_user, get_user,
-  html_hello, internal_error, post_raw1, query_users, root, update_user,
+  add_user, custom_extractor, custom_extractor2, customized_path, delete_user, get_user, html,
+  internal_error, patch_user, post_raw1, put_user, query_users, root,
 };
 mod model;
 
+/*In axum 0.8 changes
+  from :id to {id}
+*/
 #[tokio::main]
 async fn main() {
   // initialize tracing
@@ -25,13 +28,17 @@ async fn main() {
 fn router() -> Router {
   Router::new()
     .route("/", get(root))
-    .route("/hello", get(html_hello))
+    .route("/text", get(|| async { "hello" }))
+    .route("/html", get(html))
     .route("/users/{user_id}/teams/{team_id}", get(customized_path))
     .route("/", post(post_raw1))
     .route("/users", get(query_users).post(add_user))
     .route(
       "/users/{id}",
-      get(get_user).patch(update_user).delete(delete_user),
+      get(get_user)
+        .put(put_user)
+        .patch(patch_user)
+        .delete(delete_user),
     )
     .route("/custom_extractor", post(custom_extractor))
     .route("/custom_extractor2", post(custom_extractor2))
