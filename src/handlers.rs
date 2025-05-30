@@ -1,16 +1,16 @@
-use std::{clone, collections::HashMap, fmt::Debug};
-
 use axum::{
   Json,
   body::Body,
-  extract::{Path, Query, Request},
+  extract::{Path, Query, Request, State},
   http::StatusCode,
   response::{Html, IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json, to_string_pretty};
+use std::sync::{Arc, Mutex};
+use std::{clone, collections::HashMap, fmt::Debug};
 
-use crate::model::User;
+use crate::{SharedState, model::User};
 
 pub async fn root() -> &'static str {
   "Root!"
@@ -96,7 +96,42 @@ pub async fn resp_output(Path(id): Path<String>) -> Response {
   };
   let json_data = to_string_pretty(&output).unwrap();
   Response::new(Body::new(json_data))
-  //Response::new(Body::new("str".to_string()))
+  //Response::new(Body::new("str".to_owned()))
+}
+//Dynamic output
+pub async fn into_response_trait_dynamic_output(Path(id): Path<String>) -> impl IntoResponse {
+  "intoResponse trait".to_owned() + &id
+  //Response::new(Body::new("str".to_owned()))
+  //(StatusCode::ACCEPTED, "str")
+}
+
+pub async fn post_shared_state(
+  State(shared_state): State<Arc<Mutex<SharedState>>>,
+) -> (StatusCode, Json<Value>) {
+  let mut state = shared_state.lock().unwrap();
+  println!("input state: {:?}", state);
+  (*state).token = "xyz".to_owned();
+  println!("output state: {:?}", state);
+  (
+    StatusCode::OK,
+    Json(json!({
+      "auth": state.auth.clone(),
+      "token": state.token.clone()
+    })),
+  )
+}
+pub async fn get_shared_state(
+  State(shared_state): State<Arc<Mutex<SharedState>>>,
+) -> (StatusCode, Json<Value>) {
+  let state = shared_state.lock().unwrap();
+  println!("shared_state: {:?}", state);
+  (
+    StatusCode::OK,
+    Json(json!({
+      "auth": state.auth.clone(),
+      "token": state.token.clone()
+    })),
+  )
 }
 
 pub async fn list_users() -> (StatusCode, Json<Value>) {

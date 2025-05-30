@@ -2,13 +2,10 @@ use axum::{
   Router,
   routing::{get, post},
 };
+use std::sync::{Arc, Mutex};
 //use uuid::Uuid;
 mod handlers;
-use handlers::{
-  add_user, custom_extractor, custom_extractor2, customized_path, delete_user, dynamic_json_output,
-  get_user, html, internal_error, patch_user, post_raw1, put_user, query_params, query_users,
-  request_params, resp_output, root,
-};
+use handlers::*;
 mod model;
 
 /*In axum 0.8 changes
@@ -26,7 +23,16 @@ async fn main() {
   axum::serve(listener, router()).await.unwrap();
 }
 
+#[derive(Debug, Clone)]
+struct SharedState {
+  auth: String,
+  token: String,
+}
 fn router() -> Router {
+  let shared_state = Arc::new(Mutex::new(SharedState {
+    auth: "1234".to_owned(),
+    token: "abcd".to_owned(),
+  }));
   Router::new()
     .route("/", get(root))
     .route("/text", get(|| async { "hello" }))
@@ -45,7 +51,16 @@ fn router() -> Router {
     .route("/", post(post_raw1))
     .route("/dynamic_json_output/{id}", get(dynamic_json_output))
     .route("/resp_output/{id}", get(resp_output))
+    .route(
+      "/into_response_trait_dynamic_output/{id}",
+      get(into_response_trait_dynamic_output),
+    )
     .route("/custom_extractor", post(custom_extractor))
     .route("/custom_extractor2", post(custom_extractor2))
     .route("/internal_error", get(internal_error))
+    .route(
+      "/shared_state",
+      post(post_shared_state).get(get_shared_state),
+    )
+    .with_state(shared_state)
 } // PUT method is to replace/add the entire resource
