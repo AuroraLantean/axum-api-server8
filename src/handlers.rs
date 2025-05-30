@@ -1,12 +1,14 @@
+use std::{clone, collections::HashMap, fmt::Debug};
+
 use axum::{
   Json,
   body::Body,
-  extract::{Path, Query},
+  extract::{Path, Query, Request},
   http::StatusCode,
   response::{Html, IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{Value, json, to_string_pretty};
 
 use crate::model::User;
 
@@ -17,23 +19,25 @@ pub async fn html() -> Html<&'static str> {
   Html("<h1>Hello, World!</h1>")
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct Params {
-  pub user_id: u32,
-  pub team_id: u32,
+pub async fn query_params(Query(params): Query<HashMap<String, String>>) -> &'static str {
+  for k in params.keys() {
+    println!("key is {}", k)
+  }
+  for v in params.values() {
+    println!("value is {}", v)
+  }
+  "query_params!"
 }
-pub async fn customized_path(Path(params): Path<Params>) -> impl IntoResponse {
-  axum::Json(params)
+//good for all methods
+pub async fn request_params(req: Request) -> String {
+  let headers = req.headers();
+  let method = req.method();
+  let uri = req.uri();
+  println!("headers: {:?}", headers);
+  println!("method: {:?}", method);
+  println!("uri: {:?}", uri);
+  "".to_owned() + method.as_str() + "," + &uri.to_string()
 }
-pub async fn post_raw1() -> Response {
-  Response::builder()
-    .status(StatusCode::CREATED)
-    .header("Content-Type", "application/json")
-    .body(Body::from(r#"{"name":"john"}"#))
-    .expect("response builder")
-  //(StatusCode::CREATED, "New Post Added!")
-} //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
-
 #[derive(Debug, Deserialize)]
 pub struct AddUser {
   pub name: String,
@@ -67,6 +71,32 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   println!("{:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
+}
+pub async fn dynamic_json_output(Path(id): Path<String>) -> Json<Value> {
+  //serde_json::{Value, json};
+  Json(json!({
+      "id": id,
+      "name": "john",
+      "balance": 1000,
+  }))
+}
+
+#[derive(Serialize)]
+#[allow(dead_code)]
+struct Output {
+  id: String,
+  name: String,
+  balance: i32,
+}
+pub async fn resp_output(Path(id): Path<String>) -> Response {
+  let output = Output {
+    id,
+    name: "John Doe".to_owned(),
+    balance: 34,
+  };
+  let json_data = to_string_pretty(&output).unwrap();
+  Response::new(Body::new(json_data))
+  //Response::new(Body::new("str".to_string()))
 }
 
 pub async fn list_users() -> (StatusCode, Json<Value>) {
@@ -169,6 +199,24 @@ pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   }*/
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Params {
+  pub user_id: u32,
+  pub team_id: u32,
+}
+pub async fn customized_path(Path(params): Path<Params>) -> impl IntoResponse {
+  axum::Json(params)
+}
+pub async fn post_raw1() -> Response {
+  Response::builder()
+    .status(StatusCode::CREATED)
+    .header("Content-Type", "application/json")
+    .body(Body::from(r#"{"name":"john"}"#))
+    .expect("response builder")
+  //(StatusCode::CREATED, "New Post Added!")
+} //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
+
 pub async fn custom_extractor(Json(value): Json<Value>) -> (StatusCode, Json<Error>) {
   println!("value: {:?}", value);
   let err = Error {
