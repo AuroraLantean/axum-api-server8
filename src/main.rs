@@ -37,6 +37,13 @@ fn router() -> Router {
     auth: "1234".to_owned(),
     token: "abcd".to_owned(),
   }));
+
+  let user_router: Router<_> = Router::new()
+    .route("/profile", get(user_profile))
+    .route("/setting", get(user_setting)); //nested route
+
+  let route1 = Router::new().route("/about", get(about_handler)); //merged route
+
   Router::new()
     .route("/", get(root))
     .route("/text", get(|| async { "hello" }))
@@ -73,6 +80,11 @@ fn router() -> Router {
       "/extension",
       get(extension_handler).route_layer(from_fn(extension_middleware)),
     )
+    .nest("/user", user_router)
+    .route("/wildcard/{*rest}", get(wildcard_handler))
+    .route("/uri/xyz", get(uri_handler))
+    .route("/contact_form", post(contact_form_handler))
+    .merge(route1)
     .fallback(fallback_handler)
     .layer(from_fn(middleware_general))
     .with_state(shared_state)

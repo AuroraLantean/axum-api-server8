@@ -1,8 +1,8 @@
 use axum::{
   Extension, Json,
   body::Body,
-  extract::{Path, Query, Request, State},
-  http::StatusCode,
+  extract::{Form, Path, Query, Request, State},
+  http::{StatusCode, Uri},
   response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
@@ -36,7 +36,7 @@ pub async fn request_params(req: Request) -> String {
   println!("headers: {:?}", headers);
   println!("method: {:?}", method);
   println!("uri: {:?}", uri);
-  "".to_owned() + method.as_str() + "," + &uri.to_string()
+  "".to_owned() + method.as_str() + " " + &uri.to_string()
 }
 #[derive(Debug, Deserialize)]
 pub struct AddUser {
@@ -101,7 +101,7 @@ pub async fn resp_output(Path(id): Path<String>) -> Response {
 }
 //Dynamic output
 pub async fn into_response_trait_dynamic_output(Path(id): Path<String>) -> impl IntoResponse {
-  "intoResponse trait".to_owned() + &id
+  "intoResponse trait: ".to_owned() + &id
   //Response::new(Body::new("str".to_owned()))
   //(StatusCode::ACCEPTED, "str")
 }
@@ -121,27 +121,53 @@ pub async fn post_shared_state(
 }
 pub async fn get_shared_state(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<SharedState>) {
-  let state = shared_state.lock().unwrap();
-  println!("shared_state: {:?}", state);
-  (StatusCode::OK, Json(state.clone()))
+) -> (StatusCode, Json<Arc<Mutex<SharedState>>>) {
+  (StatusCode::OK, Json(shared_state))
 }
 pub async fn extension_handler(
   Extension(jwt_data): Extension<Arc<JwtData>>,
-) -> (StatusCode, Json<Value>) {
+) -> (StatusCode, Json<Arc<JwtData>>) {
   println!("jwt_data: {:?}", jwt_data);
-  (
-    StatusCode::OK,
-    Json(json!({
-      "id": "id",
-      "name": "name"
-    })),
-  )
+  (StatusCode::OK, Json(jwt_data))
 }
 pub async fn redirect_handler() -> impl IntoResponse {
   Redirect::to("/text")
 }
+pub async fn user_profile(
+  State(state): State<Arc<Mutex<SharedState>>>,
+) -> (StatusCode, Json<Arc<Mutex<SharedState>>>) {
+  println!("state: {:?}", state);
+  (StatusCode::OK, Json(state))
+}
+pub async fn user_setting() -> impl IntoResponse {
+  (StatusCode::OK, "user_setting")
+}
 
+pub async fn about_handler() -> impl IntoResponse {
+  (StatusCode::OK, "about")
+}
+pub async fn wildcard_handler(Path(path): Path<String>) -> impl IntoResponse {
+  println!("path: {:?}", path);
+  (StatusCode::OK, "wildcard: ".to_owned() + &path)
+}
+pub async fn uri_handler(uri: Uri) -> impl IntoResponse {
+  println!("uri: {:?}", uri);
+  (StatusCode::OK, "uri: ".to_owned() + uri.path())
+}
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ContactForm {
+  pub name: String,
+  pub email: String,
+  pub phone: u32,
+} //Deserialize for input
+pub async fn contact_form_handler(
+  Form(contact_form): Form<ContactForm>,
+) -> (StatusCode, Json<ContactForm>) {
+  println!("contact_form: {:?}", contact_form);
+  (StatusCode::OK, Json(contact_form))
+}
+
+//----------------==
 pub async fn list_users() -> (StatusCode, Json<Value>) {
   (StatusCode::FOUND, Json(Value::Null))
 }
@@ -249,7 +275,7 @@ pub struct Params {
   pub team_id: u32,
 }
 pub async fn customized_path(Path(params): Path<Params>) -> impl IntoResponse {
-  axum::Json(params)
+  Json(params)
 }
 pub async fn post_raw1() -> Response {
   Response::builder()
@@ -277,10 +303,11 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
       "path": "path",
   });
   println!("err: {:?}", payload);
-  axum::Json(payload)
+  Json(payload)
   //Json(dbg!(value));
 }
 
+//----------------==
 #[derive(Debug, Serialize, Clone)]
 pub struct Error {
   pub code: u64, // Uuid,

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{extract::Request, middleware::Next, response::IntoResponse};
+use serde::Serialize;
 
 pub async fn middleware_general(request: Request, next: Next) -> impl IntoResponse {
   println!("middleware_general");
@@ -15,7 +16,7 @@ pub async fn auth(request: Request, next: Next) -> impl IntoResponse {
   response
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct JwtData {
   id: u32,
   name: String,
