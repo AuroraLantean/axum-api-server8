@@ -1,11 +1,15 @@
 use axum::{
   Router,
+  middleware::from_fn,
   routing::{get, post},
 };
+use serde::Serialize;
 use std::sync::{Arc, Mutex};
 //use uuid::Uuid;
 mod handlers;
 use handlers::*;
+mod middleware;
+use middleware::*;
 mod model;
 
 /*In axum 0.8 changes
@@ -23,7 +27,7 @@ async fn main() {
   axum::serve(listener, router()).await.unwrap();
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 struct SharedState {
   auth: String,
   token: String,
@@ -36,6 +40,7 @@ fn router() -> Router {
   Router::new()
     .route("/", get(root))
     .route("/text", get(|| async { "hello" }))
+    .route("/redirect", get(redirect_handler))
     .route("/html", get(html))
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
@@ -60,7 +65,16 @@ fn router() -> Router {
     .route("/internal_error", get(internal_error))
     .route(
       "/shared_state",
-      post(post_shared_state).get(get_shared_state),
+      post(post_shared_state)
+        .get(get_shared_state)
+        .route_layer(from_fn(auth)),
     )
+    .route(
+      "/extension",
+      get(extension_handler).route_layer(from_fn(extension_middleware)),
+    )
+    .fallback(fallback_handler)
+    .layer(from_fn(middleware_general))
     .with_state(shared_state)
+  //the layer middleware will run first, then the route_layer middleware will run second, then the route function runs.
 } // PUT method is to replace/add the entire resource

@@ -1,16 +1,16 @@
 use axum::{
-  Json,
+  Extension, Json,
   body::Body,
   extract::{Path, Query, Request, State},
   http::StatusCode,
-  response::{Html, IntoResponse, Response},
+  response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json, to_string_pretty};
 use std::sync::{Arc, Mutex};
-use std::{clone, collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug};
 
-use crate::{SharedState, model::User};
+use crate::{SharedState, middleware::JwtData, model::User};
 
 pub async fn root() -> &'static str {
   "Root!"
@@ -97,6 +97,7 @@ pub async fn resp_output(Path(id): Path<String>) -> Response {
   let json_data = to_string_pretty(&output).unwrap();
   Response::new(Body::new(json_data))
   //Response::new(Body::new("str".to_owned()))
+  //Response::new(Body::from("Hello World!"))
 }
 //Dynamic output
 pub async fn into_response_trait_dynamic_output(Path(id): Path<String>) -> impl IntoResponse {
@@ -104,34 +105,41 @@ pub async fn into_response_trait_dynamic_output(Path(id): Path<String>) -> impl 
   //Response::new(Body::new("str".to_owned()))
   //(StatusCode::ACCEPTED, "str")
 }
+pub async fn fallback_handler() -> impl IntoResponse {
+  (StatusCode::NOT_FOUND, "404 | Not Found")
+}
 
+//#[axum::debug]
 pub async fn post_shared_state(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<Value>) {
+) -> (StatusCode, Json<SharedState>) {
   let mut state = shared_state.lock().unwrap();
   println!("input state: {:?}", state);
   (*state).token = "xyz".to_owned();
   println!("output state: {:?}", state);
-  (
-    StatusCode::OK,
-    Json(json!({
-      "auth": state.auth.clone(),
-      "token": state.token.clone()
-    })),
-  )
+  (StatusCode::OK, Json(state.clone()))
 }
 pub async fn get_shared_state(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<Value>) {
+) -> (StatusCode, Json<SharedState>) {
   let state = shared_state.lock().unwrap();
   println!("shared_state: {:?}", state);
+  (StatusCode::OK, Json(state.clone()))
+}
+pub async fn extension_handler(
+  Extension(jwt_data): Extension<Arc<JwtData>>,
+) -> (StatusCode, Json<Value>) {
+  println!("jwt_data: {:?}", jwt_data);
   (
     StatusCode::OK,
     Json(json!({
-      "auth": state.auth.clone(),
-      "token": state.token.clone()
+      "id": "id",
+      "name": "name"
     })),
   )
+}
+pub async fn redirect_handler() -> impl IntoResponse {
+  Redirect::to("/text")
 }
 
 pub async fn list_users() -> (StatusCode, Json<Value>) {
