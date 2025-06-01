@@ -10,6 +10,7 @@ pub async fn middleware_general(request: Request, next: Next) -> impl IntoRespon
   //Response::new(Body::from("Hello World!"))
 }
 
+#[allow(dead_code)]
 pub async fn auth(request: Request, next: Next) -> impl IntoResponse {
   println!("auth");
   let response = next.run(request).await;

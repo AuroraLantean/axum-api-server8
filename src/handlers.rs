@@ -10,7 +10,7 @@ use serde_json::{Value, json, to_string_pretty};
 use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{SharedState, middleware::JwtData, model::User};
+use crate::{SharedState, middleware::JwtData};
 
 pub async fn root() -> &'static str {
   "Root!"
@@ -38,40 +38,7 @@ pub async fn request_params(req: Request) -> String {
   println!("uri: {:?}", uri);
   "".to_owned() + method.as_str() + " " + &uri.to_string()
 }
-#[derive(Debug, Deserialize)]
-pub struct AddUser {
-  pub name: String,
-  pub occupation: String,
-  pub email: String,
-  pub phone: String,
-  pub balance: i32,
-}
-pub async fn add_user(Json(input): Json<AddUser>) -> (StatusCode, Json<User>) {
-  let user = User {
-    id: 1337, //id: Uuid::new_v4(),
-    name: input.name,
-    occupation: input.occupation,
-    email: input.email,
-    phone: input.phone,
-    balance: input.balance,
-  };
-  println!("{:?}", user);
-  //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::CREATED, Json(user)) //Code = `201 Created`
-}
-pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
-  let user = User {
-    id: id.parse::<i32>().expect("id"),
-    name: String::from("JohnDoe"),
-    occupation: String::from("developer"),
-    email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    balance: 1000,
-  };
-  println!("{:?}", user);
-  //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::FOUND, Json(user)) //Code = `201 Created`
-}
+
 pub async fn dynamic_json_output(Path(id): Path<String>) -> Json<Value> {
   //serde_json::{Value, json};
   Json(json!({
@@ -110,19 +77,24 @@ pub async fn fallback_handler() -> impl IntoResponse {
 }
 
 //#[axum::debug]
+#[allow(dead_code)]
 pub async fn post_shared_state(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<SharedState>) {
+) -> impl IntoResponse {
   let mut state = shared_state.lock().unwrap();
   println!("input state: {:?}", state);
   (*state).token = "xyz".to_owned();
   println!("output state: {:?}", state);
-  (StatusCode::OK, Json(state.clone()))
+  (StatusCode::OK, state.token.clone()) //Json(state.clone())
 }
+#[allow(dead_code)]
 pub async fn get_shared_state(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<Arc<Mutex<SharedState>>>) {
-  (StatusCode::OK, Json(shared_state))
+) -> impl IntoResponse {
+  //(StatusCode, Json<Arc<Mutex<SharedState>>>)
+  let state = shared_state.lock().unwrap();
+  println!("shared_state: {:?}", shared_state);
+  (StatusCode::OK, state.token.clone()) //Json(shared_state)
 }
 pub async fn extension_handler(
   Extension(jwt_data): Extension<Arc<JwtData>>,
@@ -133,11 +105,8 @@ pub async fn extension_handler(
 pub async fn redirect_handler() -> impl IntoResponse {
   Redirect::to("/text")
 }
-pub async fn user_profile(
-  State(state): State<Arc<Mutex<SharedState>>>,
-) -> (StatusCode, Json<Arc<Mutex<SharedState>>>) {
-  println!("state: {:?}", state);
-  (StatusCode::OK, Json(state))
+pub async fn user_profile() -> impl IntoResponse {
+  (StatusCode::OK, "user_profile") //Json(state)
 }
 pub async fn user_setting() -> impl IntoResponse {
   (StatusCode::OK, "user_setting")
@@ -168,6 +137,7 @@ pub async fn contact_form_handler(
 }
 
 //----------------==
+#[allow(dead_code)]
 pub async fn list_users() -> (StatusCode, Json<Value>) {
   (StatusCode::FOUND, Json(Value::Null))
 }
@@ -193,80 +163,6 @@ pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> 
       .collect::<Vec<_>>();
 
   Json(todos)*/
-}
-
-pub async fn put_user(
-  Path(id): Path<String>,
-  Json(input): Json<AddUser>,
-) -> (StatusCode, Json<User>) {
-  let user = User {
-    id: id.parse::<i32>().expect("id"),
-    name: input.name,
-    occupation: String::from("developer"),
-    email: input.email,
-    phone: input.phone,
-    balance: input.balance,
-  };
-  println!("new user: {:?}", user);
-  //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::OK, Json(user)) //Code = `201 Created`
-}
-#[derive(Debug, Deserialize)]
-pub struct PatchUser {
-  pub name: Option<String>,
-  pub occupation: Option<String>,
-  pub email: Option<String>,
-  pub phone: Option<String>,
-  pub balance: Option<i32>,
-}
-pub async fn patch_user(
-  Path(id): Path<String>,
-  Json(input): Json<PatchUser>,
-) -> (StatusCode, Json<User>) {
-  let mut user = User {
-    id: id.parse::<i32>().expect("id"),
-    name: String::from("JohnDoe"),
-    occupation: String::from("developer"),
-    email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    balance: 1000,
-  };
-  println!("old user: {:?}", user);
-  if let Some(name) = input.name {
-    user.name = name;
-  }
-  if let Some(occupation) = input.occupation {
-    user.occupation = occupation;
-  }
-  if let Some(email) = input.email {
-    user.email = email;
-  }
-  if let Some(phone) = input.phone {
-    user.phone = phone;
-  }
-  if let Some(balance) = input.balance {
-    user.balance = i32::try_from(balance).expect("msg");
-  }
-  println!("new user: {:?}", user);
-  (StatusCode::OK, Json(user))
-}
-pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
-  let user = User {
-    id: id.parse::<i32>().expect("id"),
-    name: String::from("JohnDoe"),
-    occupation: String::from("developer"),
-    email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    balance: 1000,
-  };
-  println!("old user: {:?}", user);
-
-  /*if db.write().unwrap().remove(&id).is_some() {
-    StatusCode::NO_CONTENT
-  } else {
-      StatusCode::NOT_FOUND
-  }*/
-  (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
 
 #[derive(Debug, Deserialize, Serialize)]

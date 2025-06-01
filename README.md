@@ -25,6 +25,8 @@ $ docker ps -a
 ## TODO
 https://github.com/tokio-rs/axum
 
+https://medium.com/@mikecode/rust-axum-create-user-log-in-user-crypt-password-verify-password-connect-to-database-69c65a3c10b4
+
 query-params-with-empty-strings
 customize-path-rejection
 get header request-id
