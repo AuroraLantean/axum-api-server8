@@ -24,7 +24,8 @@ pub async fn db() -> Client {
 
   let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
     .await
-    .unwrap();
+    .expect("database connection failed");
+  println!("database connection successful");
 
   tokio::spawn(async move {
     if let Err(e) = connection.await {

@@ -1,28 +1,33 @@
 use axum::{
-  Json,
+  Extension, Json,
   extract::{Path, State},
   http::StatusCode,
   response::IntoResponse,
 };
 use bcrypt;
+use jsonwebtoken::{EncodingKey, Header, encode};
 use serde::Deserialize;
-use std::sync::Arc;
+use serde_json::json;
+use std::{
+  sync::Arc,
+  time::{SystemTime, UNIX_EPOCH},
+};
 use tokio_postgres::Client;
 
-use crate::model::User;
+use crate::{JWT_KEY, middleware::JwtClaims, model::User};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-pub struct AddUser {
+pub struct FromUser {
   pub name: String,
   pub password: String,
-  pub occupation: String,
-  pub email: String,
-  pub phone: String,
+  pub occupation: Option<String>,
+  pub email: Option<String>,
+  pub phone: Option<String>,
 } //in postman: Body > raw: {...}
 pub async fn add_user(
   State(client): State<Arc<Client>>,
-  Json(input): Json<AddUser>,
+  Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("add_user: {:?}", input);
   let hashed_pw = bcrypt::hash(input.password, 10).unwrap();
@@ -41,17 +46,69 @@ pub async fn add_user(
     name: input.name,
     password: hashed_pw,
     occupation: input.occupation,
-    email: input.email,
-    phone: input.phone,
-    balance: input.balance,
+    email: input.email.unwrap_or("".to_owned()),
+    phone: input.phone.unwrap_or("".to_owned()),,
   };
   println!("{:?}", user);
   db.write().unwrap().insert(user.id, user.clone());*/
-  (StatusCode::CREATED, "Success".to_owned()) //Code = `201 Created`
+  (StatusCode::CREATED, "Success") //Code = `201 Created`
 }
 //docker exec -it postgres1 psql -U postgres
 //\c db_name1
 //SELECT * FROM db_name1;
+
+pub async fn login(
+  State(client): State<Arc<Client>>,
+  Json(input): Json<FromUser>,
+) -> impl IntoResponse {
+  println!("login: {:?}", input);
+  let rows = client
+    .query("SELECT * FROM users WHERE name = $1", &[&input.name])
+    .await
+    .unwrap();
+
+  let hash_pw: String = rows[0].get(2); //password is at index 2
+  let is_valid = bcrypt::verify(input.password, &hash_pw).unwrap();
+
+  if is_valid {
+    let name = rows[0].get(1);
+    let jwt_claim = JwtClaims {
+      sub: name,
+      exp: SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 60 * 60, // 1 hour valid JWT
+    };
+    let jwt_token = encode(
+      &Header::default(),
+      &jwt_claim,
+      &EncodingKey::from_secret(JWT_KEY.as_bytes()),
+    )
+    .expect("JWT encode()");
+    (
+      StatusCode::OK,
+      Json(json!({
+        "result": "success",
+        "jwt_token": jwt_token,
+      })),
+    )
+  } else {
+    (
+      StatusCode::UNAUTHORIZED,
+      Json(json!({
+        "result": "Invalid password",
+        "jwt_token": "",
+      })),
+    )
+  }
+}
+
+// to receive request from auth middleware
+pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse {
+  let res = format!("Hello {}", name);
+  (StatusCode::OK, res)
+}
 
 pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
@@ -69,15 +126,15 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
 
 pub async fn put_user(
   Path(id): Path<String>,
-  Json(input): Json<AddUser>,
+  Json(input): Json<FromUser>,
 ) -> (StatusCode, Json<User>) {
   let user = User {
     id: id.parse::<i32>().expect("id"),
     name: input.name,
     password: input.password,
     occupation: String::from("developer"),
-    email: input.email,
-    phone: input.phone,
+    email: input.email.unwrap_or("".to_owned()),
+    phone: input.phone.unwrap_or("".to_owned()),
   };
   println!("new user: {:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
@@ -140,3 +197,25 @@ pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   }*/
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
+
+/*
+//#[axum::debug]
+#[allow(dead_code)]
+pub async fn post_shared_state(
+  State(shared_state): State<Arc<Mutex<SharedState>>>,
+) -> impl IntoResponse {
+  let mut state = shared_state.lock().unwrap();
+  println!("input state: {:?}", state);
+  (*state).token = "xyz".to_owned();
+  println!("output state: {:?}", state);
+  (StatusCode::OK, state.token.clone()) //Json(state.clone())
+}
+#[allow(dead_code)]
+pub async fn get_shared_state(
+  State(shared_state): State<Arc<Mutex<SharedState>>>,
+) -> impl IntoResponse {
+  //(StatusCode, Json<Arc<Mutex<SharedState>>>)
+  let state = shared_state.lock().unwrap();
+  println!("shared_state: {:?}", shared_state);
+  (StatusCode::OK, state.token.clone()) //Json(shared_state)
+}*/

@@ -1,16 +1,16 @@
 use axum::{
   Extension, Json,
   body::Body,
-  extract::{Form, Path, Query, Request, State},
+  extract::{Form, Path, Query, Request},
   http::{StatusCode, Uri},
   response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json, to_string_pretty};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::{collections::HashMap, fmt::Debug};
 
-use crate::{SharedState, middleware::JwtData};
+use crate::middleware::JwtData;
 
 pub async fn root() -> &'static str {
   "Root!"
@@ -76,26 +76,6 @@ pub async fn fallback_handler() -> impl IntoResponse {
   (StatusCode::NOT_FOUND, "404 | Not Found")
 }
 
-//#[axum::debug]
-#[allow(dead_code)]
-pub async fn post_shared_state(
-  State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> impl IntoResponse {
-  let mut state = shared_state.lock().unwrap();
-  println!("input state: {:?}", state);
-  (*state).token = "xyz".to_owned();
-  println!("output state: {:?}", state);
-  (StatusCode::OK, state.token.clone()) //Json(state.clone())
-}
-#[allow(dead_code)]
-pub async fn get_shared_state(
-  State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> impl IntoResponse {
-  //(StatusCode, Json<Arc<Mutex<SharedState>>>)
-  let state = shared_state.lock().unwrap();
-  println!("shared_state: {:?}", shared_state);
-  (StatusCode::OK, state.token.clone()) //Json(shared_state)
-}
 pub async fn extension_handler(
   Extension(jwt_data): Extension<Arc<JwtData>>,
 ) -> (StatusCode, Json<Arc<JwtData>>) {

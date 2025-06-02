@@ -16,6 +16,7 @@ mod model;
 mod users;
 use users::*;
 
+pub const JWT_KEY: &str = "secret";
 /*In axum 0.8 changes
   from :id to {id}
 */
@@ -73,6 +74,8 @@ fn router(client: Client) -> Router {
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
     .route("/users", get(query_users).post(add_user))
+    .route("/login", post(login))
+    .route("/protected", get(protected).layer(from_fn(auth)))
     .route(
       "/users/{id}",
       get(get_user)
