@@ -39,7 +39,7 @@ async fn main() {
   let listener = tokio::net::TcpListener::bind(endpoint).await.unwrap();
   println!("server running on {endpoint:?}");
 
-  let client = db().await;
+  let client = tokio_postgres1().await;
   axum::serve(listener, router(client)).await.unwrap();
 }
 
@@ -164,7 +164,14 @@ fn router(client: Client) -> Router {
     impl IntoResponse is useful at returning different types of results: tuple and response.
 
     PUT method is to replace/add the entire resource
-    */
+
+    ------== Session
+    let session_store = session(pool).await;
+    router(session_store);
+
+    in router(session_store: SessionStore<SessionSqlitePool>) { ...
+    Router::new().route("/session_set_handler", get(session_set_handler)).layer(SessionLayer::new(session_store))
+    }*/
 }
 
 //TODO:

@@ -122,7 +122,12 @@ Deployment with Shuttle
 https://docs.shuttle.dev/examples/axum
 
 ## Installation
-install terminator, slumber, just
+install terminator
+
+install slumber http client
+
+install just command runner
+
 install Rust 1.87.0 (17067e9ac 2025-05-09)
 
 ```

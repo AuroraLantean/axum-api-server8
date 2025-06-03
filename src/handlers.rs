@@ -6,6 +6,8 @@ use axum::{
   http::{StatusCode, Uri},
   response::{Html, IntoResponse, Redirect, Response},
 };
+use axum_session::Session;
+use axum_session_sqlx::SessionSqlitePool;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json, to_string_pretty};
 use std::sync::{Arc, Mutex};
@@ -48,7 +50,6 @@ pub async fn dynamic_json_output(Path(id): Path<String>) -> Json<Value> {
 }
 
 #[derive(Serialize)]
-#[allow(dead_code)]
 struct Output {
   id: String,
   name: String,
@@ -266,4 +267,18 @@ where
   fn from(err: E) -> Self {
     Self(err.into())
   }
+}
+
+//---------------== Session Handler
+async fn _session_set_handler(session: Session<SessionSqlitePool>) -> impl IntoResponse {
+  session.set("u_id", 1);
+
+  let s_id = session.get_session_id();
+  println!("s_id: {:?}", s_id);
+
+  (StatusCode::OK, s_id.to_string())
+}
+async fn _session_get_handler(session: Session<SessionSqlitePool>) -> impl IntoResponse {
+  let value: String = session.get("u_id").unwrap();
+  (StatusCode::OK, value)
 }
