@@ -197,25 +197,3 @@ pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   }*/
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
-
-/*
-//#[axum::debug]
-#[allow(dead_code)]
-pub async fn post_shared_state(
-  State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> impl IntoResponse {
-  let mut state = shared_state.lock().unwrap();
-  println!("input state: {:?}", state);
-  (*state).token = "xyz".to_owned();
-  println!("output state: {:?}", state);
-  (StatusCode::OK, state.token.clone()) //Json(state.clone())
-}
-#[allow(dead_code)]
-pub async fn get_shared_state(
-  State(shared_state): State<Arc<Mutex<SharedState>>>,
-) -> impl IntoResponse {
-  //(StatusCode, Json<Arc<Mutex<SharedState>>>)
-  let state = shared_state.lock().unwrap();
-  println!("shared_state: {:?}", shared_state);
-  (StatusCode::OK, state.token.clone()) //Json(shared_state)
-}*/

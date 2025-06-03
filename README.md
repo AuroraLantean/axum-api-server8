@@ -3,12 +3,23 @@
 ## Postgres Setup
 ```
 $ docker volume create postgres1-data
-$ docker run --name postgres1 -e POSTGRES_PASSWORD=password -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
+$ docker run --name postgres1 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=admin -e POSTGRES_DB=db_name1 -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
+
+$ docker stop postgres1
+$ docker rm postgres1
+
+$ docker run --name postgres1 ...
+$ docker start postgres1
 $ docker ps -a
 
 // Add table inside Docker Postgres one line at a time
 $ docker exec -it postgres1 psql -U postgres
-postgres=# CREATE TABLE users(
+
+postgres=# \dt  ... find all tables
+postgres=# CREATE DATABASE "db_name1";
+postgres=# \c db_name1  ... to connect
+
+db_name1=# CREATE TABLE users(
 id SERIAL PRIMARY KEY,
 name VARCHAR(255),
 password VARCHAR(255),
@@ -16,6 +27,7 @@ occupation VARCHAR(255),
 email VARCHAR(255),
 phone VARCHAR(20)
 );
+db_name1=# SELECT * FROM users;
 postgres=# \q
 
 $ docker stop postgres1
@@ -110,10 +122,10 @@ Deployment with Shuttle
 https://docs.shuttle.dev/examples/axum
 
 ## Installation
-rustc 1.87.0 (17067e9ac 2025-05-09)
+install terminator, slumber, just
+install Rust 1.87.0 (17067e9ac 2025-05-09)
 
 ```
-cargo add axum tokio --features tokio/full
 cargo install cargo-watch
 ```
 
@@ -122,4 +134,4 @@ Start Terminator: `just term`
 
 Run the server: `just watch`
 
-Start Slumber to make requests: `just httpclient`
+Start Slumber to make requests: `slumber`

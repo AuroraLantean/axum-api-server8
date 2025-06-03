@@ -1,10 +1,19 @@
 use axum::{
   Router,
-  middleware::from_fn,
+  http::{
+    HeaderValue,
+    header::{AUTHORIZATION, CONTENT_TYPE},
+  },
+  middleware::{from_fn, from_fn_with_state},
   routing::{get, post},
 };
+use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tokio_postgres::Client;
+use tower_http::{
+  cors::{Any, CorsLayer},
+  services::ServeDir,
+};
 //use uuid::Uuid;
 mod handlers;
 use handlers::*;
@@ -34,14 +43,15 @@ async fn main() {
   axum::serve(listener, router(client)).await.unwrap();
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize)]
 struct SharedState {
-  auth: String,
-  token: String,
-  //db_client: Arc<DbClient>,
-  //db_pool: Arc<DbPool>,
-  //config: Arc<Config>,
+  mesg: String,
+  num: u32,
+}
+#[derive(Debug, Clone)]
+struct SharedUser {
+  name: String,
+  age: u32,
 }
 
 fn router(client: Client) -> Router {
@@ -54,10 +64,30 @@ fn router(client: Client) -> Router {
     let db_pool = Arc::new(DbPool {});
     let config = Arc::new(Config {});
   */
-  let _shared_state = Arc::new(Mutex::new(SharedState {
-    auth: "1234".to_owned(),
-    token: "abcd".to_owned(),
+
+  let cors_layer = CorsLayer::new()
+    .allow_methods(Any)
+    .allow_headers([CONTENT_TYPE, AUTHORIZATION])
+    .allow_origin("http://localhost:4000".parse::<HeaderValue>().unwrap());
+  //allow_method: [Method::GET, Method::POST]
+
+  let static_files = ServeDir::new("./assets"); // localhost:3000/static/bitcoin.jpg
+  let arc_shared_state_mut = Arc::new(Mutex::new(SharedState {
+    mesg: "arc_sharedState_mut".to_owned(),
+    num: 100,
   }));
+  let arc_shared_state = Arc::new(SharedState {
+    mesg: "arc_sharedState".to_owned(),
+    num: 100,
+  });
+  let shared_state = SharedState {
+    mesg: "sharedState".to_owned(),
+    num: 200,
+  };
+  let user = SharedUser {
+    name: "sharedUser".to_owned(),
+    age: 27,
+  };
 
   let user_router: Router<_> = Router::new()
     .route("/profile", get(user_profile))
@@ -68,6 +98,14 @@ fn router(client: Client) -> Router {
   //#[axum::debug_handler]
   Router::new()
     .route("/", get(root))
+    .route(
+      "/get_state_in_middleware",
+      get(get_state_in_middleware_handler),
+    )
+    .layer(from_fn_with_state(
+      arc_shared_state.clone(),
+      get_state_in_middleware,
+    ))
     .route("/text", get(|| async { "hello" }))
     .route("/redirect", get(redirect_handler))
     .route("/html", get(html))
@@ -86,32 +124,47 @@ fn router(client: Client) -> Router {
     .route("/users/{user_id}/teams/{team_id}", get(customized_path))
     .route("/", post(post_raw1))
     .route("/dynamic_json_output/{id}", get(dynamic_json_output))
-    .route("/resp_output/{id}", get(resp_output))
     .route(
-      "/into_response_trait_dynamic_output/{id}",
-      get(into_response_trait_dynamic_output),
+      "/into_response_trait_custom_output/{id}",
+      get(into_response_trait_custom_output),
     )
+    .route("/resp_output/{id}", get(resp_output))
     .route("/custom_extractor", post(custom_extractor))
     .route("/custom_extractor2", post(custom_extractor2))
     .route("/internal_error", get(internal_error))
-    /*.route(
-      "/shared_state",
-      post(post_shared_state)
-        .get(get_shared_state)
-        .route_layer(from_fn(auth)),
-    )*/
     .route(
-      "/extension",
-      get(extension_handler).route_layer(from_fn(extension_middleware)),
+      "/add_middleware_data",
+      get(middleware_data_handler).route_layer(from_fn(add_middleware_data)),
     )
     .nest("/user", user_router)
+    .nest_service("/static", static_files)
     .route("/wildcard/{*rest}", get(wildcard_handler))
     .route("/uri/xyz", get(uri_handler))
     .route("/contact_form", post(contact_form_handler))
     .merge(route1)
     .fallback(fallback_handler)
     .layer(from_fn(middleware_general))
-    //.with_state(shared_state)
     .with_state(Arc::new(client))
-  //the layer middleware will run first, then the route_layer middleware will run second, then the route function runs.
-} // PUT method is to replace/add the entire resource
+    .route("/get_state_in_handler", get(get_state_handler))
+    .with_state((shared_state, user))
+    .route(
+      "/mut_shared_state",
+      get(get_mut_shared_state_handler).post(post_mut_shared_state_handler),
+    )
+    .with_state(arc_shared_state_mut)
+    .layer(cors_layer)
+
+  /*.with_state() will cause all routes above it to receive that state. So you can have multiple states like:
+  .route().with_state(client_in_arc)
+  .route().with_state(user, message)
+  .route().with_state(shared_state_in_arc)
+
+    the layer middleware will run first, then the route_layer middleware will run second, then the route function runs.
+
+    impl IntoResponse is useful at returning different types of results: tuple and response.
+
+    PUT method is to replace/add the entire resource
+    */
+}
+
+//TODO:

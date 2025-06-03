@@ -1,14 +1,19 @@
 use std::sync::Arc;
 
-use axum::{extract::Request, http::StatusCode, middleware::Next, response::IntoResponse};
+use axum::{
+  extract::{Request, State},
+  http::StatusCode,
+  middleware::Next,
+  response::IntoResponse,
+};
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 
-use crate::JWT_KEY;
+use crate::{JWT_KEY, SharedState};
 
-pub async fn middleware_general(request: Request, next: Next) -> impl IntoResponse {
+pub async fn middleware_general(req: Request, next: Next) -> impl IntoResponse {
   println!("middleware_general");
-  let response = next.run(request).await; // next.run() must run, OR all other routes will be blocked!
+  let response = next.run(req).await; // next.run() must run, OR all other routes will be blocked!
   response
   //Response::new(Body::from("Hello World!"))
 }
@@ -19,7 +24,7 @@ pub struct JwtClaims {
   pub exp: u64,
 }
 pub async fn auth(mut req: Request, next: Next) -> impl IntoResponse {
-  println!("auth");
+  println!("middleware: auth");
   match req.headers().get("authorization") {
     None => (StatusCode::UNAUTHORIZED, "No JWT").into_response(),
     Some(header_value) => {
@@ -45,17 +50,28 @@ pub async fn auth(mut req: Request, next: Next) -> impl IntoResponse {
 } //"into_response()" is useful when the match needs to return different types: tuple and response.
 
 #[derive(Debug, Serialize)]
-pub struct JwtData {
-  id: u32,
-  name: String,
+pub struct MiddlewareData {
+  num: u32,
+  str: String,
 }
-pub async fn extension_middleware(mut request: Request, next: Next) -> impl IntoResponse {
-  println!("auth");
-  let jwt_data = JwtData {
-    id: 0,
-    name: String::from("JohnDoe"),
+//use extensions to add data in middleware
+pub async fn add_middleware_data(mut req: Request, next: Next) -> impl IntoResponse {
+  println!("middleware: add_middleware_data");
+  let jwt_data = MiddlewareData {
+    num: 0,
+    str: String::from("data from middleware"),
   };
-  request.extensions_mut().insert(Arc::new(jwt_data)); //need Arc for the clone trait requirement
-  let response = next.run(request).await;
+  req.extensions_mut().insert(Arc::new(jwt_data)); //need Arc for the clone trait requirement
+  let response = next.run(req).await;
+  response
+}
+
+pub async fn get_state_in_middleware(
+  State(state): State<Arc<SharedState>>,
+  req: Request,
+  next: Next,
+) -> impl IntoResponse {
+  println!("middleware: get_state_in_middleware. state: {:?}", state);
+  let response = next.run(req).await;
   response
 }

@@ -1,16 +1,15 @@
+use crate::{SharedState, SharedUser, middleware::MiddlewareData};
 use axum::{
   Extension, Json,
   body::Body,
-  extract::{Form, Path, Query, Request},
+  extract::{Form, Path, Query, Request, State},
   http::{StatusCode, Uri},
   response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json, to_string_pretty};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, fmt::Debug};
-
-use crate::middleware::JwtData;
 
 pub async fn root() -> &'static str {
   "Root!"
@@ -55,6 +54,20 @@ struct Output {
   name: String,
   balance: i32,
 }
+impl IntoResponse for Output {
+  fn into_response(self) -> Response {
+    let res = serde_json::to_string_pretty(&self).unwrap();
+    Response::new(Body::from(res))
+  }
+}
+//Return dynamic custom type
+pub async fn into_response_trait_custom_output(Path(id): Path<String>) -> impl IntoResponse {
+  Output {
+    id,
+    name: "John Doe".to_owned(),
+    balance: 300,
+  } // "out: ".to_owned() + &id + &name + balance
+}
 pub async fn resp_output(Path(id): Path<String>) -> Response {
   let output = Output {
     id,
@@ -66,24 +79,59 @@ pub async fn resp_output(Path(id): Path<String>) -> Response {
   //Response::new(Body::new("str".to_owned()))
   //Response::new(Body::from("Hello World!"))
 }
-//Dynamic output
-pub async fn into_response_trait_dynamic_output(Path(id): Path<String>) -> impl IntoResponse {
-  "intoResponse trait: ".to_owned() + &id
-  //Response::new(Body::new("str".to_owned()))
-  //(StatusCode::ACCEPTED, "str")
+
+//------------== Middleware
+pub async fn middleware_data_handler(
+  Extension(middleware_data): Extension<Arc<MiddlewareData>>,
+) -> impl IntoResponse {
+  println!("{:?}", middleware_data);
+  (StatusCode::OK, Json(middleware_data))
+}
+pub async fn get_state_in_middleware_handler() -> impl IntoResponse {
+  println!("get_state_in_middleware_handler");
+  (StatusCode::OK, "get_state_in_middleware_handler")
+}
+pub async fn get_state_handler(
+  State((shared_state, shared_user)): State<(SharedState, SharedUser)>,
+) -> impl IntoResponse {
+  println!("get_state_handler");
+  let txt = format!(
+    "id: {}, mesg: {}, name: {}, age: {}",
+    shared_state.num, shared_state.mesg, shared_user.name, shared_user.age
+  );
+  (StatusCode::OK, txt)
+}
+pub async fn get_mut_shared_state_handler(
+  State(shared_state_mut): State<Arc<Mutex<SharedState>>>,
+) -> impl IntoResponse {
+  let state = shared_state_mut.lock().unwrap();
+  println!("shared_state_mut: {:?}", state);
+  (StatusCode::OK, Json(state.clone())) //Json(shared_state)
+}
+#[derive(Debug, Deserialize)]
+pub struct NewState {
+  pub mesg: String,
+  pub num: u32,
+}
+pub async fn post_mut_shared_state_handler(
+  State(shared_state): State<Arc<Mutex<SharedState>>>,
+  Json(input): Json<NewState>,
+) -> impl IntoResponse {
+  let mut state = shared_state.lock().unwrap();
+  println!("state: {:?}", state);
+
+  println!("original json: {:?}", input);
+  (*state).mesg = input.mesg;
+  (*state).num = input.num;
+  println!("new state: {:?}", state);
+  (StatusCode::OK, Json(state.clone()))
+}
+
+pub async fn redirect_handler() -> impl IntoResponse {
+  Redirect::to("/text")
 }
 pub async fn fallback_handler() -> impl IntoResponse {
   (StatusCode::NOT_FOUND, "404 | Not Found")
-}
-
-pub async fn extension_handler(
-  Extension(jwt_data): Extension<Arc<JwtData>>,
-) -> (StatusCode, Json<Arc<JwtData>>) {
-  println!("jwt_data: {:?}", jwt_data);
-  (StatusCode::OK, Json(jwt_data))
-}
-pub async fn redirect_handler() -> impl IntoResponse {
-  Redirect::to("/text")
 }
 pub async fn user_profile() -> impl IntoResponse {
   (StatusCode::OK, "user_profile") //Json(state)
