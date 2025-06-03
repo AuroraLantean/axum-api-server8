@@ -9,7 +9,7 @@ use axum::{
 use jsonwebtoken::{DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 
-use crate::{JWT_KEY, SharedState};
+use crate::SharedState;
 
 pub async fn middleware_general(req: Request, next: Next) -> impl IntoResponse {
   println!("middleware_general");
@@ -25,13 +25,15 @@ pub struct JwtClaims {
 }
 pub async fn auth(mut req: Request, next: Next) -> impl IntoResponse {
   println!("middleware: auth");
+  let jwt_secret = dotenvy::var("JWT_SECRET").expect("JWT_SECRET not found in .env");
+
   match req.headers().get("authorization") {
     None => (StatusCode::UNAUTHORIZED, "No JWT").into_response(),
     Some(header_value) => {
       let token = header_value.to_str().unwrap();
       match decode(
         token,
-        &DecodingKey::from_secret(JWT_KEY.as_bytes()),
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
         &Validation::default(),
       ) {
         Err(err) => (StatusCode::UNAUTHORIZED, err.to_string()).into_response(),

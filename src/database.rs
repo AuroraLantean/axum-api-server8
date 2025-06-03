@@ -22,8 +22,10 @@ pub struct Config {
 pub async fn tokio_postgres1() -> Client {
   // see Readme or Docker file > Docker Postgres ... to setup a Postgres Docker first
   // $ docker start container_name
-  let connection_string =
-    "host=localhost port=5431 user=postgres password=password dbname=db_name1";
+  let connection_string = dotenvy::var("DB_POSTGRES_DOCKER_STRING")
+    .expect("DB_POSTGRES_DOCKER_STRING not found in env file");
+  println!("connection_string: {}", connection_string);
+  //let connection_string = "host=localhost port=5431 user=postgres password=password dbname=db_name1";
 
   let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
     .await

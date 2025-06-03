@@ -38,6 +38,9 @@ $ docker ps -a
 ## TODO
 https://github.com/tokio-rs/axum
 
+Envy to serialize env vars into structs
+https://github.com/softprops/envy
+
 https://medium.com/@mikecode/rust-axum-create-user-log-in-user-crypt-password-verify-password-connect-to-database-69c65a3c10b4
 
 query-params-with-empty-strings

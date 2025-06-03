@@ -14,7 +14,7 @@ use std::{
 };
 use tokio_postgres::Client;
 
-use crate::{JWT_KEY, middleware::JwtClaims, model::User};
+use crate::{middleware::JwtClaims, model::User};
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -108,10 +108,12 @@ pub async fn login(
         .as_secs()
         + 60 * 60, // 1 hour valid JWT
     };
+    let jwt_secret = dotenvy::var("JWT_SECRET").expect("JWT_SECRET not found in .env");
+
     let jwt_result = encode(
       &Header::default(),
       &jwt_claim,
-      &EncodingKey::from_secret(JWT_KEY.as_bytes()),
+      &EncodingKey::from_secret(jwt_secret.as_bytes()),
     );
     let jwt_token = if let Ok(jwt_token) = jwt_result {
       jwt_token

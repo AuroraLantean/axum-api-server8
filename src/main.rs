@@ -25,15 +25,13 @@ mod model;
 mod users;
 use users::*;
 
-pub const JWT_KEY: &str = "secret";
 /*In axum 0.8 changes
   from :id to {id}
 */
 #[tokio::main]
 async fn main() {
-  // initialize tracing
   tracing_subscriber::fmt::init();
-
+  dotenvy::dotenv().expect(".env file not found");
   let endpoint = "0.0.0.0:3000";
 
   let listener = tokio::net::TcpListener::bind(endpoint).await.unwrap();
