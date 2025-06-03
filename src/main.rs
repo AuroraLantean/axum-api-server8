@@ -1,3 +1,5 @@
+use async_graphql::{EmptyMutation, EmptySubscription, Schema};
+use async_graphql_axum::GraphQL;
 use axum::{
   Router,
   http::{
@@ -24,6 +26,8 @@ use database::*;
 mod model;
 mod users;
 use users::*;
+mod graphql;
+use graphql::*;
 
 /*In axum 0.8 changes
   from :id to {id}
@@ -93,6 +97,8 @@ fn router(client: Client) -> Router {
 
   let route1 = Router::new().route("/about", get(about_handler)); //merged route
 
+  let schema = Schema::build(Query, EmptyMutation, EmptySubscription).finish();
+
   //#[axum::debug_handler]
   Router::new()
     .route("/", get(root))
@@ -139,6 +145,10 @@ fn router(client: Client) -> Router {
     .route("/wildcard/{*rest}", get(wildcard_handler))
     .route("/uri/xyz", get(uri_handler))
     .route("/contact_form", post(contact_form_handler))
+    .route(
+      "/graphql",
+      get(graphql_handler).post_service(GraphQL::new(schema)),
+    )
     .merge(route1)
     .fallback(fallback_handler)
     .layer(from_fn(middleware_general))

@@ -166,34 +166,6 @@ pub async fn contact_form_handler(
 }
 
 //----------------==
-#[allow(dead_code)]
-pub async fn list_users() -> (StatusCode, Json<Value>) {
-  (StatusCode::FOUND, Json(Value::Null))
-}
-#[derive(Debug, Deserialize, Default)]
-pub struct Pagination {
-  //#[serde(default, deserialize_with = "empty_string_as_none")]
-  pub offset: Option<usize>,
-  pub limit: Option<usize>,
-}
-//{{host}}/users?offset=1&limit=100
-pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> */) {
-  //let todos = db.read().unwrap();
-  println!("pagination.offset: {:?}", pagination.offset.unwrap_or(0));
-  println!(
-    "pagination.limit: {:?}",
-    pagination.limit.unwrap_or(usize::MAX)
-  );
-  /*let todos = todos
-      .values()
-      .skip(pagination.offset.unwrap_or(0))
-      .take(pagination.limit.unwrap_or(usize::MAX))
-      .cloned()
-      .collect::<Vec<_>>();
-
-  Json(todos)*/
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Params {
   pub user_id: u32,
@@ -232,7 +204,7 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
   //Json(dbg!(value));
 }
 
-//----------------==
+//----------------== Error ;;;
 #[derive(Debug, Serialize, Clone)]
 pub struct Error {
   pub code: u64, // Uuid,

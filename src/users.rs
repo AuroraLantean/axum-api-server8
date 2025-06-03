@@ -1,6 +1,6 @@
 use axum::{
   Extension, Json,
-  extract::{Path, State},
+  extract::{Path, Query, State},
   http::StatusCode,
   response::IntoResponse,
 };
@@ -141,7 +141,7 @@ pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse 
 
 pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<i32>().expect("id"),
+    id: id.parse::<i32>().expect("id i32"),
     name: String::from("JohnDoe"),
     password: String::from("password"),
     occupation: String::from("developer"),
@@ -153,12 +153,35 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct Pagination {
+  //#[serde(default, deserialize_with = "empty_string_as_none")]
+  pub offset: Option<usize>,
+  pub limit: Option<usize>,
+}
+//{{host}}/users?offset=1&limit=100
+pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> */) {
+  //let todos = db.read().unwrap();
+  println!("pagination.offset: {:?}", pagination.offset.unwrap_or(0));
+  println!(
+    "pagination.limit: {:?}",
+    pagination.limit.unwrap_or(usize::MAX)
+  );
+  /*let users = users
+      .values()
+      .skip(pagination.offset.unwrap_or(0))
+      .take(pagination.limit.unwrap_or(usize::MAX))
+      .cloned()
+      .collect::<Vec<_>>();
+  Json(users)*/
+}
+
 pub async fn put_user(
   Path(id): Path<String>,
   Json(input): Json<FromUser>,
 ) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<i32>().expect("id"),
+    id: id.parse::<i32>().expect("id i32"),
     name: input.name,
     password: input.password.unwrap_or("".to_owned()),
     occupation: String::from("developer"),
@@ -182,7 +205,7 @@ pub async fn patch_user(
   Json(input): Json<PatchUser>,
 ) -> (StatusCode, Json<User>) {
   let mut user = User {
-    id: id.parse::<i32>().expect("id"),
+    id: id.parse::<i32>().expect("id i32"),
     name: String::from("JohnDoe"),
     password: String::from("password"),
     occupation: String::from("developer"),
@@ -210,7 +233,7 @@ pub async fn patch_user(
 }
 pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
-    id: id.parse::<i32>().expect("id"),
+    id: id.parse::<i32>().expect("id i32"),
     name: String::from("JohnDoe"),
     password: String::from("password"),
     occupation: String::from("developer"),
