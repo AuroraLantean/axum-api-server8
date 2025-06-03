@@ -20,7 +20,7 @@ use crate::{JWT_KEY, middleware::JwtClaims, model::User};
 #[allow(dead_code)]
 pub struct FromUser {
   pub name: String,
-  pub password: String,
+  pub password: Option<String>,
   pub occupation: Option<String>,
   pub email: Option<String>,
   pub phone: Option<String>,
@@ -30,17 +30,29 @@ pub async fn add_user(
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("add_user: {:?}", input);
-  let hashed_pw = bcrypt::hash(input.password, 10).unwrap();
+  if None == input.password {
+    (StatusCode::BAD_REQUEST, "empty password");
+  }
+  let hashed_result = bcrypt::hash(input.password.unwrap(), 10);
+  let hashed_pw = if let Ok(hashed_pw) = hashed_result {
+    hashed_pw
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "bcrypt hash error");
+  };
   println!("hashed_pw: {:?}", hashed_pw);
 
-  client
+  let query_result = client
     .execute(
       "INSERT INTO users (name, password) VALUES ($1, $2)",
       &[&input.name, &hashed_pw],
     )
-    .await
-    .unwrap();
+    .await;
 
+  if let Ok(_row_num) = query_result {
+    (StatusCode::CREATED, "Success") //Code = `201 Created`
+  } else {
+    (StatusCode::INTERNAL_SERVER_ERROR, "db insertion error")
+  }
   /*let user = User {
     id: 1337, //id: Uuid::new_v4(),
     name: input.name,
@@ -51,7 +63,6 @@ pub async fn add_user(
   };
   println!("{:?}", user);
   db.write().unwrap().insert(user.id, user.clone());*/
-  (StatusCode::CREATED, "Success") //Code = `201 Created`
 }
 //docker exec -it postgres1 psql -U postgres
 //\c db_name1
@@ -62,14 +73,31 @@ pub async fn login(
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("login: {:?}", input);
-  let rows = client
+  let query_result = client
     .query("SELECT * FROM users WHERE name = $1", &[&input.name])
-    .await
-    .unwrap();
+    .await;
+  let rows = if let Ok(rows) = query_result {
+    rows
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "db query error").into_response();
+  };
 
+  if rows.len() == 0 {
+    return (StatusCode::BAD_REQUEST, "user not found").into_response();
+  } else if rows.len() > 1 {
+    return (StatusCode::BAD_REQUEST, "multiple user found").into_response();
+  }
   let hash_pw: String = rows[0].get(2); //password is at index 2
-  let is_valid = bcrypt::verify(input.password, &hash_pw).unwrap();
-
+  let is_valid = if let Some(password) = input.password {
+    let result = bcrypt::verify(password, &hash_pw);
+    if let Ok(boo) = result {
+      boo
+    } else {
+      return (StatusCode::BAD_REQUEST, "invalid password").into_response();
+    }
+  } else {
+    return (StatusCode::BAD_REQUEST, "empty password").into_response();
+  };
   if is_valid {
     let name = rows[0].get(1);
     let jwt_claim = JwtClaims {
@@ -80,12 +108,16 @@ pub async fn login(
         .as_secs()
         + 60 * 60, // 1 hour valid JWT
     };
-    let jwt_token = encode(
+    let jwt_result = encode(
       &Header::default(),
       &jwt_claim,
       &EncodingKey::from_secret(JWT_KEY.as_bytes()),
-    )
-    .expect("JWT encode()");
+    );
+    let jwt_token = if let Ok(jwt_token) = jwt_result {
+      jwt_token
+    } else {
+      return (StatusCode::INTERNAL_SERVER_ERROR, "jwt encoding error").into_response();
+    };
     (
       StatusCode::OK,
       Json(json!({
@@ -93,14 +125,9 @@ pub async fn login(
         "jwt_token": jwt_token,
       })),
     )
+      .into_response()
   } else {
-    (
-      StatusCode::UNAUTHORIZED,
-      Json(json!({
-        "result": "Invalid password",
-        "jwt_token": "",
-      })),
-    )
+    (StatusCode::UNAUTHORIZED, "Invalid password").into_response()
   }
 }
 
@@ -131,7 +158,7 @@ pub async fn put_user(
   let user = User {
     id: id.parse::<i32>().expect("id"),
     name: input.name,
-    password: input.password,
+    password: input.password.unwrap_or("".to_owned()),
     occupation: String::from("developer"),
     email: input.email.unwrap_or("".to_owned()),
     phone: input.phone.unwrap_or("".to_owned()),

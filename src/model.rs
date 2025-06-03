@@ -10,3 +10,7 @@ pub struct User {
   pub phone: String,
   //pub balance: i32,
 }
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct UserList {
+  list: Vec<User>,
+}

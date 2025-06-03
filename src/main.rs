@@ -161,7 +161,7 @@ fn router(client: Client) -> Router {
 
     the layer middleware will run first, then the route_layer middleware will run second, then the route function runs.
 
-    impl IntoResponse is useful at returning different types of results: tuple and response.
+    impl IntoResponse / into_response is useful for returning different types: tuple or Json.
 
     PUT method is to replace/add the entire resource
 
