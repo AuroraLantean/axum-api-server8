@@ -11,7 +11,7 @@ use axum::{
 };
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
-use tokio_postgres::Client;
+//use tokio_postgres::Client;
 use tower_http::{
   cors::{Any, CorsLayer},
   services::ServeDir,
@@ -28,21 +28,28 @@ mod users;
 use users::*;
 mod graphql;
 use graphql::*;
+mod utils;
 
 /*In axum 0.8 changes
-  from :id to {id}
+  :id  => {id}
 */
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt::init();
   dotenvy::dotenv().expect(".env file not found");
-  let endpoint = "0.0.0.0:3000";
 
-  let listener = tokio::net::TcpListener::bind(endpoint).await.unwrap();
-  println!("server running on {endpoint:?}");
+  let server_addr = dotenvy::var("SERVER_ADDRESS").unwrap_or("127.0.0.1:3000".to_owned());
 
-  let client = tokio_postgres1().await;
-  axum::serve(listener, router(client)).await.unwrap();
+  let listener = tokio::net::TcpListener::bind(&server_addr)
+    .await
+    .expect("Could not add tcp listener");
+  println!("server running on {server_addr:?}");
+
+  let poolbb8 = tokio_postgres1().await;
+  let _db_pool = sqlx_postgres1();
+  axum::serve(listener, router(poolbb8))
+    .await
+    .expect("Error at Axum::serve");
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -56,7 +63,7 @@ struct SharedUser {
   age: u32,
 }
 
-fn router(client: Client) -> Router {
+fn router(pool: BB8Pool) -> Router {
   //TODO: https://docs.rs/deadpool-postgres/latest/deadpool_postgres/
   //TODO: https://github.com/tokio-rs/axum/discussions/2819
   //TODO: pass pool to handler: https://stackoverflow.com/questions/76246672/unable-to-pass-tokio-postgres-pool-connections-to-axum-handler
@@ -116,6 +123,7 @@ fn router(client: Client) -> Router {
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
     .route("/users", get(query_with_pagination).post(add_user))
+    .route("/get_users", get(get_users))
     .route("/login", post(login))
     .route("/protected", get(protected).layer(from_fn(auth)))
     .route("/add_with_query_params", post(add_with_query_params))
@@ -154,7 +162,7 @@ fn router(client: Client) -> Router {
     .merge(route1)
     .fallback(fallback_handler)
     .layer(from_fn(middleware_general))
-    .with_state(Arc::new(client))
+    .with_state(pool)
     .route("/get_state_in_handler", get(get_state_handler))
     .with_state((shared_state, user))
     .route(

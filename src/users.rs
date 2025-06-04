@@ -1,3 +1,4 @@
+use crate::{database::BB8Pool, middleware::JwtClaims, model::User};
 use axum::{
   Extension, Json, debug_handler,
   extract::{Path, Query, State},
@@ -6,15 +7,11 @@ use axum::{
 };
 use bcrypt;
 use jsonwebtoken::{EncodingKey, Header, encode};
+use rust_decimal::prelude::*;
 use serde::Deserialize;
 use serde_json::json;
-use std::{
-  sync::Arc,
-  time::{SystemTime, UNIX_EPOCH},
-};
-use tokio_postgres::Client;
-
-use crate::{middleware::JwtClaims, model::User};
+use std::time::{SystemTime, UNIX_EPOCH};
+use time::OffsetDateTime;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -26,7 +23,7 @@ pub struct FromUser {
   phone: Option<String>,
 } //in postman: Body > raw: {...}
 pub async fn add_user(
-  State(client): State<Arc<Client>>,
+  State(pool): State<BB8Pool>,
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("add_user: {:?}", input);
@@ -41,12 +38,17 @@ pub async fn add_user(
   };
   println!("hashed_pw: {:?}", hashed_pw);
 
-  let query_result = client
-    .execute(
-      "INSERT INTO users (name, password) VALUES ($1, $2)",
-      &[&input.name, &hashed_pw],
-    )
-    .await;
+  let conn_result = pool.get().await; //.map_err(internal_error)?;
+  let query_result = if let Ok(conn) = conn_result {
+    conn
+      .execute(
+        "INSERT INTO users (name, password) VALUES ($1, $2)",
+        &[&input.name, &hashed_pw],
+      )
+      .await
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "db pool error");
+  };
 
   if let Ok(_row_num) = query_result {
     (StatusCode::CREATED, "Success") //Code = `201 Created`
@@ -70,7 +72,7 @@ pub async fn add_user(
 
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params(
-  State(_client): State<Arc<Client>>,
+  State(_client): State<BB8Pool>,
   Query(mut user): Query<User>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}", user);
@@ -85,7 +87,7 @@ pub struct Referal {
 }
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params2(
-  State(_client): State<Arc<Client>>,
+  State(_client): State<BB8Pool>,
   Query(mut user): Query<User>,
   Query(referal): Query<Referal>,
 ) -> impl IntoResponse {
@@ -94,14 +96,40 @@ pub async fn add_with_query_params2(
   (StatusCode::CREATED, Json(user)) //consumes the request body!
 }
 
-pub async fn login(
-  State(client): State<Arc<Client>>,
-  Json(input): Json<FromUser>,
-) -> impl IntoResponse {
+pub async fn get_users(State(pool): State<BB8Pool>) -> impl IntoResponse {
+  println!("get_users");
+  let conn_result = pool.get().await; //.map_err(internal_error);
+
+  let query_result = if let Ok(conn) = conn_result {
+    let query_result = conn.query("SELECT * FROM users", &[]).await;
+    query_result
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "db pool error").into_response();
+  };
+
+  let rows = if let Ok(rows) = query_result {
+    rows
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "db query error").into_response();
+  };
+  println!("rows: {:?}", rows);
+  println!("row[0]: {:?}", rows[0]);
+  return (StatusCode::OK, "ok").into_response();
+}
+
+pub async fn login(State(pool): State<BB8Pool>, Json(input): Json<FromUser>) -> impl IntoResponse {
   println!("login: {:?}", input);
-  let query_result = client
-    .query("SELECT * FROM users WHERE name = $1", &[&input.name])
-    .await;
+  let conn_result = pool.get().await; //.map_err(internal_error);
+
+  let query_result = if let Ok(conn) = conn_result {
+    let query_result = conn
+      .query("SELECT * FROM users WHERE name = $1", &[&input.name])
+      .await;
+    query_result
+  } else {
+    return (StatusCode::INTERNAL_SERVER_ERROR, "db pool error").into_response();
+  };
+
   let rows = if let Ok(rows) = query_result {
     rows
   } else {
@@ -174,6 +202,9 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),
     phone: String::from("1234"),
+    priority: 0,
+    balance: dec!(0),
+    updated_at: OffsetDateTime::now_utc(),
   };
   println!("{:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
@@ -215,6 +246,9 @@ pub async fn put_user(
     occupation: String::from("developer"),
     email: input.email.unwrap_or("".to_owned()),
     phone: input.phone.unwrap_or("".to_owned()),
+    priority: 0,
+    balance: dec!(0),
+    updated_at: OffsetDateTime::now_utc(),
   };
   println!("new user: {:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
@@ -239,6 +273,9 @@ pub async fn patch_user(
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),
     phone: String::from("1234"),
+    priority: 0,
+    balance: dec!(0),
+    updated_at: OffsetDateTime::now_utc(),
   };
   println!("old user: {:?}", user);
   if let Some(name) = input.name {
@@ -267,6 +304,9 @@ pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
     occupation: String::from("developer"),
     email: String::from("john@crypto.com"),
     phone: String::from("1234"),
+    priority: 0,
+    balance: dec!(0),
+    updated_at: OffsetDateTime::now_utc(),
   };
   println!("old user: {:?}", user);
 

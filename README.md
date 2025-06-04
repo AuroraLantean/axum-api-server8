@@ -29,11 +29,14 @@ postgres=# \c db_name1  ... to connect
 
 db_name1=# CREATE TABLE users(
 id SERIAL PRIMARY KEY,
-name VARCHAR(255),
-password VARCHAR(255),
+name VARCHAR(255) UNIQUE NOT NULL,
+password VARCHAR(255) NOT NULL,
 occupation VARCHAR(255),
-email VARCHAR(255),
-phone VARCHAR(20)
+email VARCHAR(255) UNIQUE,
+phone VARCHAR(32) UNIQUE,
+priority INT,
+balance Numeric(26, 18),
+updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 db_name1=# SELECT * FROM users;
 postgres=# \q

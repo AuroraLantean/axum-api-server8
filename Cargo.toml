@@ -7,14 +7,14 @@ edition = "2024"
 anyhow = "1.0.98"
 axum = { version = "0.8.4", features = ["macros"] }
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+serde_json = { version = "1.0.140", features = ["arbitrary_precision"] }
 tokio = { version = "1.45.1", features = ["full"] }
 dotenvy = { version = "0.15.7" }
 tokio-postgres = "0.7.13"
+bb8 = "0.9.0"
+bb8-postgres = "0.9.0"
 deadpool-postgres = { version = "0.14.1" }
-bcrypt = "0.17.0"
-jsonwebtoken = "9.3.1"
-uuid = { version = "1.17.0", features = ["v4", "serde"] }
+
 sqlx = { version = "0.8.6", features = [
   "postgres",
   "macros",
@@ -23,9 +23,21 @@ sqlx = { version = "0.8.6", features = [
   "runtime-tokio-native-tls",
   "tls-native-tls",
 ] }
+
+bcrypt = "0.17.0"
+jsonwebtoken = "9.3.1"
+uuid = { version = "1.17.0", features = ["v4", "serde"] }
+
 axum_session_sqlx = { version = "0.5.0", features = ["sqlite", "tls-rustls"] }
 axum_session = "0.16.0"
 tower-http = { version = "0.6.6", features = ["cors", "fs"] }
+rust_decimal = { version = "1.37.1", features = [
+  "db-postgres",
+  "db-tokio-postgres",
+  "serde-with-arbitrary-precision",
+  "macros",
+] }
+time = { version = "0.3.41", features = ["parsing", "serde", "macros"] }
 tracing-subscriber = "0.3.19"
 async-graphql = "7.0.17"
 async-graphql-axum = "7.0.17"
