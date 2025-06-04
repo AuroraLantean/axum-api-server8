@@ -1,16 +1,24 @@
 # axum-api-server8
 
 ## Postgres Setup
+### Docker Compose automatic setup
 ```
+$ docker compose -f db/dbContainer.yaml up -d
+$ docker exec -it postgres1 psql -U postgres
+
+postgres=# \l   ... find list of databases
+... confirm db_name1 exists
+
+postgres=# \c db_name1
+postgres=# \dt  ... find all tables
+... confirm the table generated from your seed file
+postgres=# SELECT * FROM users;
+```
+
+
+### Manual setup via CLI
 $ docker volume create postgres1-data
 $ docker run --name postgres1 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=admin -e POSTGRES_DB=db_name1 -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
-
-$ docker stop postgres1
-$ docker rm postgres1
-
-$ docker run --name postgres1 ...
-$ docker start postgres1
-$ docker ps -a
 
 // Add table inside Docker Postgres one line at a time
 $ docker exec -it postgres1 psql -U postgres
@@ -29,6 +37,13 @@ phone VARCHAR(20)
 );
 db_name1=# SELECT * FROM users;
 postgres=# \q
+```
+
+## Docker Container Management
+```
+$ docker stop postgres1
+$ docker start postgres1
+$ docker ps -a
 
 $ docker stop postgres1
 $ docker rm postgres1
