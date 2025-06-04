@@ -111,8 +111,8 @@ pub async fn get_mut_shared_state_handler(
 }
 #[derive(Debug, Deserialize)]
 pub struct NewState {
-  pub mesg: String,
-  pub num: u32,
+  mesg: String,
+  num: u32,
 }
 pub async fn post_mut_shared_state_handler(
   State(shared_state): State<Arc<Mutex<SharedState>>>,
@@ -154,9 +154,9 @@ pub async fn uri_handler(uri: Uri) -> impl IntoResponse {
 }
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ContactForm {
-  pub name: String,
-  pub email: String,
-  pub phone: u32,
+  name: String,
+  email: String,
+  phone: u32,
 } //Deserialize for input
 pub async fn contact_form_handler(
   Form(contact_form): Form<ContactForm>,
@@ -168,8 +168,8 @@ pub async fn contact_form_handler(
 //----------------==
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Params {
-  pub user_id: u32,
-  pub team_id: u32,
+  user_id: u32,
+  team_id: u32,
 }
 pub async fn customized_path(Path(params): Path<Params>) -> impl IntoResponse {
   Json(params)
@@ -207,8 +207,8 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
 //----------------== Error ;;;
 #[derive(Debug, Serialize, Clone)]
 pub struct Error {
-  pub code: u64, // Uuid,
-  pub mesg: String,
+  code: u64, // Uuid,
+  mesg: String,
 }
 
 pub async fn internal_error() -> Result<(), AppError> {

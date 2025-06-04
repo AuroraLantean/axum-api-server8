@@ -1,5 +1,5 @@
 use axum::{
-  Extension, Json,
+  Extension, Json, debug_handler,
   extract::{Path, Query, State},
   http::StatusCode,
   response::IntoResponse,
@@ -19,11 +19,11 @@ use crate::{middleware::JwtClaims, model::User};
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct FromUser {
-  pub name: String,
-  pub password: Option<String>,
-  pub occupation: Option<String>,
-  pub email: Option<String>,
-  pub phone: Option<String>,
+  name: String,
+  password: Option<String>,
+  occupation: Option<String>,
+  email: Option<String>,
+  phone: Option<String>,
 } //in postman: Body > raw: {...}
 pub async fn add_user(
   State(client): State<Arc<Client>>,
@@ -54,7 +54,7 @@ pub async fn add_user(
     (StatusCode::INTERNAL_SERVER_ERROR, "db insertion error")
   }
   /*let user = User {
-    id: 1337, //id: Uuid::new_v4(),
+    id: 1337, //id: Uuid::new_v4().to_string(),
     name: input.name,
     password: hashed_pw,
     occupation: input.occupation,
@@ -67,6 +67,32 @@ pub async fn add_user(
 //docker exec -it postgres1 psql -U postgres
 //\c db_name1
 //SELECT * FROM db_name1;
+
+//Must have all param fields or it will fail!
+pub async fn add_with_query_params(
+  State(_client): State<Arc<Client>>,
+  Query(mut user): Query<User>,
+) -> impl IntoResponse {
+  println!("add_with_query_params: {:?}", user);
+  user.occupation = "what job?".to_owned();
+  (StatusCode::CREATED, Json(user)) //consumes the request body!
+}
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct Referal {
+  firstname: String,
+  lastname: String,
+}
+//Must have all param fields or it will fail!
+pub async fn add_with_query_params2(
+  State(_client): State<Arc<Client>>,
+  Query(mut user): Query<User>,
+  Query(referal): Query<Referal>,
+) -> impl IntoResponse {
+  println!("add_with_query_params: {:?}, referal: {:?}", user, referal);
+  user.occupation = "what job?".to_owned();
+  (StatusCode::CREATED, Json(user)) //consumes the request body!
+}
 
 pub async fn login(
   State(client): State<Arc<Client>>,
@@ -139,6 +165,7 @@ pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse 
   (StatusCode::OK, res)
 }
 
+#[debug_handler]
 pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   let user = User {
     id: id.parse::<i32>().expect("id i32"),
@@ -150,6 +177,7 @@ pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
   };
   println!("{:?}", user);
   //db.write().unwrap().insert(user.id, user.clone());
+  //Json::from(user);//Json<User>
   (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
 
@@ -160,7 +188,7 @@ pub struct Pagination {
   pub limit: Option<usize>,
 }
 //{{host}}/users?offset=1&limit=100
-pub async fn query_users(pagination: Query<Pagination> /*, State(db): State<Db> */) {
+pub async fn query_with_pagination(pagination: Query<Pagination> /*, State(db): State<Db> */) {
   //let todos = db.read().unwrap();
   println!("pagination.offset: {:?}", pagination.offset.unwrap_or(0));
   println!(
@@ -195,10 +223,10 @@ pub async fn put_user(
 
 #[derive(Debug, Deserialize)]
 pub struct PatchUser {
-  pub name: Option<String>,
-  pub occupation: Option<String>,
-  pub email: Option<String>,
-  pub phone: Option<String>,
+  name: Option<String>,
+  occupation: Option<String>,
+  email: Option<String>,
+  phone: Option<String>,
 }
 pub async fn patch_user(
   Path(id): Path<String>,

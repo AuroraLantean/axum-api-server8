@@ -115,9 +115,11 @@ fn router(client: Client) -> Router {
     .route("/html", get(html))
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
-    .route("/users", get(query_users).post(add_user))
+    .route("/users", get(query_with_pagination).post(add_user))
     .route("/login", post(login))
     .route("/protected", get(protected).layer(from_fn(auth)))
+    .route("/add_with_query_params", post(add_with_query_params))
+    .route("/add_with_query_params2", post(add_with_query_params2))
     .route(
       "/users/{id}",
       get(get_user)
@@ -172,6 +174,12 @@ fn router(client: Client) -> Router {
     impl IntoResponse / into_response is useful for returning different types: tuple or Json.
 
     PUT method is to replace/add the entire resource
+
+    #[debug_handler] is available in Axum macros feature
+
+    Struct must have pub fields if it is used in another file
+
+    Axum::Json() will consume the request body
 
     ------== Session
     let session_store = session(pool).await;
