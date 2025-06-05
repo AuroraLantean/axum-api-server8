@@ -10,15 +10,11 @@ use axum::{
   response::IntoResponse,
 };
 use bcrypt;
-use chrono::{DateTime, Utc};
+use chrono::{FixedOffset, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use rust_decimal::prelude::*;
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, ModelTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, EntityTrait, ModelTrait};
 use serde::Deserialize;
-use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
-use time::{OffsetDateTime, UtcOffset};
-use tokio_postgres::GenericClient;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -28,6 +24,8 @@ pub struct FromUser {
   email: String,
   occupation: Option<String>,
   phone: Option<String>,
+  level: Option<i32>,
+  balance: Option<Decimal>,
 } //in postman: Body > raw: {...}
 pub async fn add_user(
   State(pool): State<SeaPool>,
@@ -259,84 +257,84 @@ pub async fn query_with_pagination(pagination: Query<Pagination> /*, State(db): 
 }
 
 pub async fn put_user(
+  State(pool): State<SeaPool>,
   Path(id): Path<String>,
   Json(input): Json<FromUser>,
-) -> (StatusCode, Json<UserRaw>) {
-  let user = UserRaw {
-    id: id.parse::<i32>().expect("id i32"),
+) -> impl IntoResponse {
+  println!("put_user: {:?}", input);
+  let id_i32 = id.parse::<i32>().expect("parse id to i32");
+  let hashed_pw = bcrypt::hash(input.password.unwrap_or("".to_owned()), 10).expect("hash password");
+
+  let _user = Model {
+    id: id_i32,
     name: input.name,
-    password: input.password.unwrap_or("".to_owned()),
-    occupation: Some(String::from("developer")),
+    password: hashed_pw,
+    occupation: Some(input.occupation.unwrap_or_default()),
     email: input.email,
-    phone: Some(input.phone.unwrap_or("".to_owned())),
-    priority: Some(0),
-    balance: dec!(0),
-    updated_at: OffsetDateTime::now_utc(),
+    phone: Some(input.phone.unwrap_or_default()),
+    level: input.level.unwrap_or_default(),
+    balance: input.balance.unwrap_or_default(),
+    updated_at: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
   };
-  println!("new user: {:?}", user);
+  //let new_model = Model::update(&pool).await.unwrap();
+  //println!("new user: {:?}", new_model);
   //db.write().unwrap().insert(user.id, user.clone());
-  (StatusCode::OK, Json(user)) //Code = `201 Created`
+  //(StatusCode::OK, Json(new_model))
+  (StatusCode::OK, "TODO")
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PatchUser {
-  name: Option<String>,
-  occupation: Option<String>,
   email: Option<String>,
+  occupation: Option<String>,
   phone: Option<String>,
+  balance: Option<String>,
 }
 pub async fn patch_user(
+  State(pool): State<SeaPool>,
   Path(id): Path<String>,
   Json(input): Json<PatchUser>,
-) -> (StatusCode, Json<UserRaw>) {
-  let mut user = UserRaw {
-    id: id.parse::<i32>().expect("id i32"),
-    name: String::from("JohnDoe"),
-    password: String::from("password"),
-    occupation: Some(String::from("developer")),
-    email: String::from("john@crypto.com"),
-    phone: Some(String::from("1234")),
-    priority: Some(0),
-    balance: dec!(0),
-    updated_at: OffsetDateTime::now_utc(),
+) -> impl IntoResponse {
+  println!("patch_user: {:?}", input);
+  let id_i32 = id.parse::<i32>().expect("parse id to i32");
+
+  let user_option = UserEntity::find_by_id(id_i32).one(&pool).await.unwrap();
+
+  let mut user: UserActiveModel = if let Some(user) = user_option {
+    user.into()
+  } else {
+    return (StatusCode::OK, "None found").into_response();
   };
+
   println!("old user: {:?}", user);
-  if let Some(name) = input.name {
-    user.name = name;
-  }
   if let Some(occupation) = input.occupation {
-    user.occupation = Some(occupation);
+    user.occupation = Set(Some(occupation));
   }
   if let Some(email) = input.email {
-    user.email = email;
+    user.email = Set(email);
   }
   if let Some(phone) = input.phone {
-    user.phone = Some(phone);
+    user.phone = Set(Some(phone));
   }
-  /*if let Some(balance) = input.balance {
-    user.balance = i32::try_from(balance).expect("msg");
-  }*/
-  println!("new user: {:?}", user);
-  (StatusCode::OK, Json(user))
-}
-pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<UserRaw>) {
-  let user = UserRaw {
-    id: id.parse::<i32>().expect("id i32"),
-    name: String::from("JohnDoe"),
-    password: String::from("password"),
-    occupation: Some(String::from("developer")),
-    email: String::from("john@crypto.com"),
-    phone: Some(String::from("1234")),
-    priority: Some(0),
-    balance: dec!(0),
-    updated_at: OffsetDateTime::now_utc(),
-  };
-  println!("old user: {:?}", user);
+  if let Some(balc_str) = input.balance {
+    let balance_dec = Decimal::from_str(balc_str.as_str()).expect("convert String to Decimal");
+    user.balance = Set(balance_dec);
+  }
+  let new_model = user.update(&pool).await.unwrap();
 
+  println!("new user: {:?}", new_model);
+  (StatusCode::OK, Json(new_model)).into_response()
+}
+pub async fn delete_user(State(pool): State<SeaPool>, Path(id): Path<String>) -> impl IntoResponse {
+  let user = Model {
+    id: id.parse::<i32>().expect("id i32"),
+    ..Default::default()
+  };
+  let _result = user.delete(&pool).await.unwrap();
   /*if db.write().unwrap().remove(&id).is_some() {
     StatusCode::NO_CONTENT
   } else {
       StatusCode::NOT_FOUND
   }*/
-  (StatusCode::FOUND, Json(user)) //Code = `201 Created`
+  (StatusCode::OK, "success") //Code = `201 Created`
 }

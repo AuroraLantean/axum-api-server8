@@ -19,7 +19,6 @@ sea-orm = { version = "1.1.12", features = [
   "runtime-tokio-native-tls",
   "macros",
   "with-chrono",
-  "with-time",
   "with-rust_decimal",
 ] }
 sqlx = { version = "0.8.6", features = [
@@ -36,23 +35,18 @@ log = "0.4.27"
 bcrypt = "0.17.0"
 jsonwebtoken = "9.3.1"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
-
-axum_session_sqlx = { version = "0.5.0", features = ["sqlite", "tls-rustls"] }
-axum_session = "0.16.0"
-tower-http = { version = "0.6.6", features = ["cors", "fs"] }
+chrono = { version = "0.4.41" }
 rust_decimal = { version = "1.37.1", features = [
   "db-postgres",
   "db-tokio-postgres",
   "serde-with-arbitrary-precision",
   "macros",
 ] }
-time = { version = "0.3.41", features = [
-  "parsing",
-  "serde",
-  "macros",
-  "local-offset",
-] }
-chrono = { version = "0.4.41" }
+
+axum_session_sqlx = { version = "0.5.0", features = ["sqlite", "tls-rustls"] }
+axum_session = "0.16.0"
+tower-http = { version = "0.6.6", features = ["cors", "fs"] }
+
 postgres = "0.19.10"
 
 tracing = "0.1.41"

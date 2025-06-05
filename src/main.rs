@@ -70,12 +70,10 @@ struct SharedUser {
 }
 
 fn router(pool: DatabaseConnection) -> Router {
-  //TODO: https://github.com/tokio-rs/axum/discussions/2819
-
-  /*let db_client = Arc::new(DbClient { client });
+  /*TODO: Axum middleware shares a pool of database connections https://github.com/tokio-rs/axum/discussions/2819
+  let db_client = Arc::new(DbClient { client });
     let db_pool = Arc::new(DbPool {});
-    let config = Arc::new(Config {});
-  */
+    let config = Arc::new(Config {});  */
 
   let cors_layer = CorsLayer::new()
     .allow_methods(Any)
@@ -197,15 +195,16 @@ fn router(pool: DatabaseConnection) -> Router {
     Rust <=> Postgres Types
     https://docs.rs/postgres/latest/postgres/types/trait.FromSql.html
     https://kotiri.com/2018/01/31/postgresql-diesel-rust-types.html
-    i32  <=> Serial, INT4, INT
-    bool <=> BOOL
-    u32  <=> OID
-    i64  <=> INT8
-    f32  <=> FLOAT4
-    f64  <=> FLOAT8
-    String, &str  <=> Varchar(n)
-    bigdecimal::BigDecimal, Decimal <=> numeric(p, s)
-    SystemTime <=> timetz, time(p) with time zone
+    https://docs.rs/sea-orm/latest/sea_orm/entity/enum.ColumnType.html
+    Serial, INT4, INT <=> i32
+    BOOL <=> bool
+    OID  <=> u32
+    INT8 <=> i64
+    FLOAT4 <=> f32
+    FLOAT8 <=> f64
+    VARCHAR <=> String, &str
+    Numeric <=> rust_decimal::Decimal, or bigdecimal::BigDecimal
+    timetz  <=> DateTimeWithTimeZone from chrono::DateTime<FixedOffset>
 
     https://github.com/sfackler/rust-postgres/blob/c5ff8cfd86e897b7c197f52684a37a4f17cecb75/postgres-types/src/lib.rs#L727
 
