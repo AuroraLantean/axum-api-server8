@@ -1,4 +1,8 @@
-use crate::{database::BB8Pool, middleware::JwtClaims, model::User};
+use crate::{
+  database::SeaPool,
+  middleware::JwtClaims,
+  model::{ActiveModel as UserActiveModel, Entity as UserEntity, Model, UserRaw},
+};
 use axum::{
   Extension, Json, debug_handler,
   extract::{Path, Query, State},
@@ -6,24 +10,27 @@ use axum::{
   response::IntoResponse,
 };
 use bcrypt;
+use chrono::{DateTime, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use rust_decimal::prelude::*;
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, DatabaseConnection, EntityTrait, ModelTrait};
 use serde::Deserialize;
 use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
-use time::OffsetDateTime;
+use time::{OffsetDateTime, UtcOffset};
+use tokio_postgres::GenericClient;
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct FromUser {
   name: String,
   password: Option<String>,
+  email: String,
   occupation: Option<String>,
-  email: Option<String>,
   phone: Option<String>,
 } //in postman: Body > raw: {...}
 pub async fn add_user(
-  State(pool): State<BB8Pool>,
+  State(pool): State<SeaPool>,
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("add_user: {:?}", input);
@@ -38,45 +45,35 @@ pub async fn add_user(
   };
   println!("hashed_pw: {:?}", hashed_pw);
 
-  let conn_result = pool.get().await; //.map_err(internal_error)?;
-  let query_result = if let Ok(conn) = conn_result {
-    conn
-      .execute(
-        "INSERT INTO users (name, password) VALUES ($1, $2)",
-        &[&input.name, &hashed_pw],
-      )
-      .await
-  } else {
-    return (StatusCode::INTERNAL_SERVER_ERROR, "db pool error");
-  };
+  let user1 = UserActiveModel {
+    name: Set(input.name),
+    password: Set(hashed_pw),
+    email: Set(input.email),
+    level: Set(1),
+    ..Default::default()
+  }; //id: Uuid::new_v4().to_string(),
+  //balance: Decimal::from_str(&co);
+  //balance: dec!(0),
+  //updated_at: OffsetDateTime::now_utc(),
+  //println!("{:?}", user1);
 
-  if let Ok(_row_num) = query_result {
+  let result = user1.insert(&pool).await;
+
+  //let result = pool.get().await; //.map_err(internal_error)?;
+  if let Ok(_) = result {
     (StatusCode::CREATED, "Success") //Code = `201 Created`
   } else {
-    (StatusCode::INTERNAL_SERVER_ERROR, "db insertion error")
+    (StatusCode::INTERNAL_SERVER_ERROR, "db insert")
   }
-  /*let user = User {
-    id: 1337, //id: Uuid::new_v4().to_string(),
-    name: input.name,
-    password: hashed_pw,
-    occupation: input.occupation,
-    email: input.email.unwrap_or("".to_owned()),
-    phone: input.phone.unwrap_or("".to_owned()),,
-  };
-  println!("{:?}", user);
-  db.write().unwrap().insert(user.id, user.clone());*/
 }
-//docker exec -it postgres1 psql -U postgres
-//\c db_name1
-//SELECT * FROM db_name1;
 
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params(
-  State(_client): State<BB8Pool>,
-  Query(mut user): Query<User>,
+  State(_client): State<SeaPool>,
+  Query(mut user): Query<UserRaw>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}", user);
-  user.occupation = "what job?".to_owned();
+  user.occupation = Some("what job?".to_owned());
   (StatusCode::CREATED, Json(user)) //consumes the request body!
 }
 #[derive(Debug, Deserialize)]
@@ -87,19 +84,37 @@ pub struct Referal {
 }
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params2(
-  State(_client): State<BB8Pool>,
-  Query(mut user): Query<User>,
+  State(_client): State<SeaPool>,
+  Query(mut user): Query<UserRaw>,
   Query(referal): Query<Referal>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}, referal: {:?}", user, referal);
-  user.occupation = "what job?".to_owned();
+  user.occupation = Some("what job?".to_owned());
   (StatusCode::CREATED, Json(user)) //consumes the request body!
 }
-
-pub async fn get_users(State(pool): State<BB8Pool>) -> impl IntoResponse {
+#[axum::debug_handler]
+pub async fn get_user_by_id(
+  State(pool): State<SeaPool>,
+  Path(id): Path<String>,
+) -> impl IntoResponse {
+  println!("get_user_by_id");
+  let id_i32 = id.parse::<i32>().expect("parse id to i32");
+  let user_option = UserEntity::find_by_id(id_i32).one(&pool).await.unwrap();
+  println!("user: {:?}", user_option);
+  if let Some(user) = user_option {
+    (StatusCode::OK, Json(user)).into_response()
+  } else {
+    (StatusCode::OK, "None found").into_response()
+  }
+}
+pub async fn get_users(State(pool): State<SeaPool>) -> impl IntoResponse {
   println!("get_users");
-  let conn_result = pool.get().await; //.map_err(internal_error);
+  let all_users = UserEntity::find().all(&pool).await.unwrap();
+  println!("all_users: {:?}", all_users);
 
+  (StatusCode::OK, "all_users").into_response()
+
+  /*let conn_result = pool.get().await; //.map_err(internal_error);
   let query_result = if let Ok(conn) = conn_result {
     let query_result = conn.query("SELECT * FROM users", &[]).await;
     query_result
@@ -112,14 +127,40 @@ pub async fn get_users(State(pool): State<BB8Pool>) -> impl IntoResponse {
   } else {
     return (StatusCode::INTERNAL_SERVER_ERROR, "db query error").into_response();
   };
-  println!("rows: {:?}", rows);
-  println!("row[0]: {:?}", rows[0]);
+  //println!("rows: {:?}", rows);
+  //for row in client.query("SELECT * FROM mytable", &[])? { ... }
+  let row = &rows[0];
+  println!("row: {:?}", row);
+  let id: i32 = row.get(0); //Serial
+  println!("id: {}", id);
+
+  let name: String = row.get(1); //VARCHAR(n)
+  println!("name: {}", name);
+  let priority: i32 = row.try_get(6).unwrap_or(-1); //INT
+  println!("priority: {}", priority);
+
+  let balc: Decimal = row.try_get(7).unwrap_or(dec!(-1)); //Numeric(p,s)
+  println!("balc: {:?}", balc);
+
+  let time: SystemTime = row.try_get(8).unwrap(); //TIMESTAMPTZ
+  println!("time: {:?}", time.elapsed());
+  //let offset = UtcOffset::local_offset_at(row.get(8));
+
+  //let time2: OffsetDateTime = row.get::<usize, OffsetDateTime>(8);
+  //let offset = UtcOffset::local_offset_at(now)?;
+
+  //let time3: chrono::DateTime<Utc> = row.get::<usize, DateTime<Utc>>(8);
+
   return (StatusCode::OK, "ok").into_response();
+  */
+  /*https://docs.rs/postgres/latest/postgres/types/trait.FromSql.html
+  trait bound `: FromSql<'_>` is not satisfied{}
+  */
 }
 
-pub async fn login(State(pool): State<BB8Pool>, Json(input): Json<FromUser>) -> impl IntoResponse {
+pub async fn login(State(pool): State<SeaPool>, Json(input): Json<FromUser>) -> impl IntoResponse {
   println!("login: {:?}", input);
-  let conn_result = pool.get().await; //.map_err(internal_error);
+  /*let conn_result = pool.get().await; //.map_err(internal_error);
 
   let query_result = if let Ok(conn) = conn_result {
     let query_result = conn
@@ -184,32 +225,14 @@ pub async fn login(State(pool): State<BB8Pool>, Json(input): Json<FromUser>) -> 
       .into_response()
   } else {
     (StatusCode::UNAUTHORIZED, "Invalid password").into_response()
-  }
+  }*/
+  (StatusCode::OK, "TODO")
 }
 
 // to receive request from auth middleware
 pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse {
   let res = format!("Hello {}", name);
   (StatusCode::OK, res)
-}
-
-#[debug_handler]
-pub async fn get_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
-  let user = User {
-    id: id.parse::<i32>().expect("id i32"),
-    name: String::from("JohnDoe"),
-    password: String::from("password"),
-    occupation: String::from("developer"),
-    email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    priority: 0,
-    balance: dec!(0),
-    updated_at: OffsetDateTime::now_utc(),
-  };
-  println!("{:?}", user);
-  //db.write().unwrap().insert(user.id, user.clone());
-  //Json::from(user);//Json<User>
-  (StatusCode::FOUND, Json(user)) //Code = `201 Created`
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -238,15 +261,15 @@ pub async fn query_with_pagination(pagination: Query<Pagination> /*, State(db): 
 pub async fn put_user(
   Path(id): Path<String>,
   Json(input): Json<FromUser>,
-) -> (StatusCode, Json<User>) {
-  let user = User {
+) -> (StatusCode, Json<UserRaw>) {
+  let user = UserRaw {
     id: id.parse::<i32>().expect("id i32"),
     name: input.name,
     password: input.password.unwrap_or("".to_owned()),
-    occupation: String::from("developer"),
-    email: input.email.unwrap_or("".to_owned()),
-    phone: input.phone.unwrap_or("".to_owned()),
-    priority: 0,
+    occupation: Some(String::from("developer")),
+    email: input.email,
+    phone: Some(input.phone.unwrap_or("".to_owned())),
+    priority: Some(0),
     balance: dec!(0),
     updated_at: OffsetDateTime::now_utc(),
   };
@@ -265,15 +288,15 @@ pub struct PatchUser {
 pub async fn patch_user(
   Path(id): Path<String>,
   Json(input): Json<PatchUser>,
-) -> (StatusCode, Json<User>) {
-  let mut user = User {
+) -> (StatusCode, Json<UserRaw>) {
+  let mut user = UserRaw {
     id: id.parse::<i32>().expect("id i32"),
     name: String::from("JohnDoe"),
     password: String::from("password"),
-    occupation: String::from("developer"),
+    occupation: Some(String::from("developer")),
     email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    priority: 0,
+    phone: Some(String::from("1234")),
+    priority: Some(0),
     balance: dec!(0),
     updated_at: OffsetDateTime::now_utc(),
   };
@@ -282,13 +305,13 @@ pub async fn patch_user(
     user.name = name;
   }
   if let Some(occupation) = input.occupation {
-    user.occupation = occupation;
+    user.occupation = Some(occupation);
   }
   if let Some(email) = input.email {
     user.email = email;
   }
   if let Some(phone) = input.phone {
-    user.phone = phone;
+    user.phone = Some(phone);
   }
   /*if let Some(balance) = input.balance {
     user.balance = i32::try_from(balance).expect("msg");
@@ -296,15 +319,15 @@ pub async fn patch_user(
   println!("new user: {:?}", user);
   (StatusCode::OK, Json(user))
 }
-pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<User>) {
-  let user = User {
+pub async fn delete_user(Path(id): Path<String>) -> (StatusCode, Json<UserRaw>) {
+  let user = UserRaw {
     id: id.parse::<i32>().expect("id i32"),
     name: String::from("JohnDoe"),
     password: String::from("password"),
-    occupation: String::from("developer"),
+    occupation: Some(String::from("developer")),
     email: String::from("john@crypto.com"),
-    phone: String::from("1234"),
-    priority: 0,
+    phone: Some(String::from("1234")),
+    priority: Some(0),
     balance: dec!(0),
     updated_at: OffsetDateTime::now_utc(),
   };

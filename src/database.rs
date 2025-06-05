@@ -7,7 +7,9 @@ use sqlx::{Executor, Pool, Postgres, Sqlite, postgres::PgPoolOptions};
 
 use bb8::Pool as PoolBB8;
 use bb8_postgres::PostgresConnectionManager;
+use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr};
 use tokio_postgres::{Client, NoTls};
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct DbClient {
@@ -23,21 +25,23 @@ pub struct Config {
   // Fields related to configuration information
 }
 
+fn get_db_connn_str(str: &str) -> String {
+  let connection_str = dotenvy::var(str).expect(str);
+  println!("postgres conn_str: {}", connection_str);
+  connection_str
+}
 //---------------== Postgres
 // see Readme or Docker file > Docker Postgres ... to setup a Postgres Docker first
 // $ docker start container_name
+
 pub type BB8Pool = PoolBB8<PostgresConnectionManager<NoTls>>;
-
 pub async fn tokio_postgres1() -> BB8Pool {
-  let connection_string = dotenvy::var("DB_POSTGRES_DOCKER_STRING")
-    .expect("DB_POSTGRES_DOCKER_STRING not found in env file");
-  println!("postgres connection_string: {}", connection_string);
-
+  let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_TOKIO");
   //Axum repo/examples/tokio-postgres
-  let manager = PostgresConnectionManager::new_from_stringlike(connection_string, NoTls).unwrap();
+  let manager = PostgresConnectionManager::new_from_stringlike(conn_str, NoTls).unwrap();
   let pool_bb8 = PoolBB8::builder().build(manager).await.unwrap();
   pool_bb8
-  /*let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+  /*let (client, connection) = tokio_postgres::connect(&conn_str, NoTls)
     .await
     .expect("database connection failed");
   println!("database connection successful via tokio_postgres1");
@@ -50,15 +54,34 @@ pub async fn tokio_postgres1() -> BB8Pool {
   client*/
 }
 
+//https://www.sea-ql.org/SeaORM/docs/install-and-config/connection/
+//Each time you call execute or query_one/all on it, a connection will be acquired and released from the pool.
+pub type SeaPool = DatabaseConnection;
+pub async fn sea_orm_db() -> SeaPool {
+  let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_SQLX");
+  //db_uri should be protocol://username:password@host/database
+  let mut opt = ConnectOptions::new(conn_str);
+  opt
+    .max_connections(10)
+    .min_connections(5)
+    .connect_timeout(Duration::from_secs(8))
+    .acquire_timeout(Duration::from_secs(8))
+    .idle_timeout(Duration::from_secs(8))
+    .max_lifetime(Duration::from_secs(8))
+    .sqlx_logging(false)
+    .sqlx_logging_level(log::LevelFilter::Info);
+  //.set_schema_search_path("my_schema"); // Setting default PostgreSQL schema
+
+  let db_conn = Database::connect(opt).await.expect("sea_orm connect");
+  db_conn
+}
 pub async fn sqlx_postgres1() -> Pool<Postgres> {
-  let database_url =
-    dotenvy::var("DB_POSTGRES_DOCKER").expect("DB_POSTGRES_DOCKER not found in env file");
-  println!("postgres database_url: {}", database_url);
+  let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_SQLX");
 
   let db_pool = PgPoolOptions::new()
     .max_connections(16)
     .acquire_timeout(Duration::from_secs(5))
-    .connect(&database_url)
+    .connect(&conn_str)
     .await
     .expect("could not connect to database");
   println!("database connection successful via sqlx_postgres1");

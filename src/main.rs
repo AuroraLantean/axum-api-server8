@@ -9,6 +9,7 @@ use axum::{
   middleware::{from_fn, from_fn_with_state},
   routing::{get, post},
 };
+use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 //use tokio_postgres::Client;
@@ -35,7 +36,11 @@ mod utils;
 */
 #[tokio::main]
 async fn main() {
-  tracing_subscriber::fmt::init();
+  tracing_subscriber::fmt()
+    .with_max_level(tracing::Level::DEBUG)
+    .with_test_writer()
+    .init();
+  //tracing_subscriber::fmt::init();
   dotenvy::dotenv().expect(".env file not found");
 
   let server_addr = dotenvy::var("SERVER_ADDRESS").unwrap_or("127.0.0.1:3000".to_owned());
@@ -45,9 +50,10 @@ async fn main() {
     .expect("Could not add tcp listener");
   println!("server running on {server_addr:?}");
 
-  let poolbb8 = tokio_postgres1().await;
-  let _db_pool = sqlx_postgres1();
-  axum::serve(listener, router(poolbb8))
+  let pool = sea_orm_db().await;
+  //let pool = tokio_postgres1().await;
+  //let pool = sqlx_postgres1().await;
+  axum::serve(listener, router(pool))
     .await
     .expect("Error at Axum::serve");
 }
@@ -63,12 +69,9 @@ struct SharedUser {
   age: u32,
 }
 
-fn router(pool: BB8Pool) -> Router {
-  //TODO: https://docs.rs/deadpool-postgres/latest/deadpool_postgres/
+fn router(pool: DatabaseConnection) -> Router {
   //TODO: https://github.com/tokio-rs/axum/discussions/2819
-  //TODO: pass pool to handler: https://stackoverflow.com/questions/76246672/unable-to-pass-tokio-postgres-pool-connections-to-axum-handler
-  //TODO: bb8_postgres pool: https://github.com/tokio-rs/axum/blob/main/examples/tokio-postgres/src/main.rs
-  // Initialize the database connection pool and configuration information
+
   /*let db_client = Arc::new(DbClient { client });
     let db_pool = Arc::new(DbPool {});
     let config = Arc::new(Config {});
@@ -123,14 +126,14 @@ fn router(pool: BB8Pool) -> Router {
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
     .route("/users", get(query_with_pagination).post(add_user))
-    .route("/get_users", get(get_users))
+    .route("/user_get_many", get(get_users))
     .route("/login", post(login))
     .route("/protected", get(protected).layer(from_fn(auth)))
     .route("/add_with_query_params", post(add_with_query_params))
     .route("/add_with_query_params2", post(add_with_query_params2))
     .route(
       "/users/{id}",
-      get(get_user)
+      get(get_user_by_id)
         .put(put_user)
         .patch(patch_user)
         .delete(delete_user),
@@ -188,6 +191,24 @@ fn router(pool: BB8Pool) -> Router {
     Struct must have pub fields if it is used in another file
 
     Axum::Json() will consume the request body
+
+    Tokio-posgres: To be safe from sql injection, make sure that all user data is passed in the second params argument.
+
+    Rust <=> Postgres Types
+    https://docs.rs/postgres/latest/postgres/types/trait.FromSql.html
+    https://kotiri.com/2018/01/31/postgresql-diesel-rust-types.html
+    i32  <=> Serial, INT4, INT
+    bool <=> BOOL
+    u32  <=> OID
+    i64  <=> INT8
+    f32  <=> FLOAT4
+    f64  <=> FLOAT8
+    String, &str  <=> Varchar(n)
+    bigdecimal::BigDecimal, Decimal <=> numeric(p, s)
+    SystemTime <=> timetz, time(p) with time zone
+
+    https://github.com/sfackler/rust-postgres/blob/c5ff8cfd86e897b7c197f52684a37a4f17cecb75/postgres-types/src/lib.rs#L727
+
 
     ------== Session
     let session_store = session(pool).await;
