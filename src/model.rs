@@ -2,7 +2,7 @@ use rust_decimal::prelude::*;
 use sea_orm::prelude::*;
 use serde::{Deserialize, Serialize};
 
-//-----------== Sea ORM Model
+//-----------== Sea ORM Model: NOT TO USE! Use SeaORM CLI to generate model instead!
 //https://www.sea-ql.org/SeaORM/docs/generate-entity/entity-structure/#column-type
 #[derive(Debug, Clone, PartialEq, Eq, DeriveEntityModel, Default, Serialize)]
 #[sea_orm(table_name = "users")]
@@ -20,26 +20,28 @@ pub struct Model {
   pub level: i32,
   pub balance: Decimal,
   pub updated_at: DateTimeWithTimeZone,
+  //pub updated_at: chrono::DataTime<chrono::Utc>,
 }
 #[derive(Debug, Clone, EnumIter, DeriveRelation)]
 pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
-//-----------== Raw Model
+//-----------== Raw Model: Should be copied from generated Entity file then add Serialize, Deserialize
 //use time::OffsetDateTime;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct UserRaw {
+pub struct UserCopied {
   pub id: i32, //u64 is not supported in sqlx
   pub name: String,
   pub password: String,
-  pub occupation: Option<String>,
   pub email: String,
+  pub occupation: Option<String>,
   pub phone: Option<String>,
-  pub priority: Option<i32>,
-  #[serde(deserialize_with = "rust_decimal::serde::arbitrary_precision::deserialize")]
+  pub level: i32,
+  //#[serde(deserialize_with = "rust_decimal::serde::arbitrary_precision::deserialize")]
   pub balance: Decimal,
   //#[serde(rename="updatedAt")]
-  pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
+  pub updated_at: Option<DateTimeWithTimeZone>,
+  //Option<chrono::DateTime<chrono::Utc>>,
   //#[serde(with = "time::serde::iso8601")]
   //pub updated_at: OffsetDateTime,
   //Nullable<Timestamp>,
@@ -48,5 +50,5 @@ pub struct UserRaw {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct UserList {
-  list: Vec<UserRaw>,
+  list: Vec<UserCopied>,
 }

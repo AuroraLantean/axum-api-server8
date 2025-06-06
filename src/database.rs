@@ -1,29 +1,12 @@
-use std::time::Duration;
-
 use axum_session::{Key, SessionConfig, SessionStore};
 use axum_session_sqlx::SessionSqlitePool;
-use serde::Serialize;
 use sqlx::{Executor, Pool, Postgres, Sqlite, postgres::PgPoolOptions};
+use std::time::Duration;
 
 use bb8::Pool as PoolBB8;
 use bb8_postgres::PostgresConnectionManager;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, DbErr};
-use tokio_postgres::{Client, NoTls};
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct DbClient {
-  // Fields related to the database connection
-  pub client: Client,
-}
-#[derive(Clone, Debug, Serialize)]
-pub struct DbPool {
-  // Fields related to the database connection pool
-}
-#[derive(Clone, Debug, Serialize)]
-pub struct Config {
-  // Fields related to configuration information
-}
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+use tokio_postgres::NoTls;
 
 fn get_db_connn_str(str: &str) -> String {
   let connection_str = dotenvy::var(str).expect(str);
@@ -34,8 +17,8 @@ fn get_db_connn_str(str: &str) -> String {
 // see Readme or Docker file > Docker Postgres ... to setup a Postgres Docker first
 // $ docker start container_name
 
-pub type BB8Pool = PoolBB8<PostgresConnectionManager<NoTls>>;
-pub async fn tokio_postgres1() -> BB8Pool {
+pub type _BB8Pool = PoolBB8<PostgresConnectionManager<NoTls>>;
+pub async fn _tokio_postgres1() -> _BB8Pool {
   let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_TOKIO");
   //Axum repo/examples/tokio-postgres
   let manager = PostgresConnectionManager::new_from_stringlike(conn_str, NoTls).unwrap();
@@ -75,7 +58,7 @@ pub async fn sea_orm_db() -> SeaPool {
   let db_conn = Database::connect(opt).await.expect("sea_orm connect");
   db_conn
 }
-pub async fn sqlx_postgres1() -> Pool<Postgres> {
+pub async fn _sqlx_postgres1() -> Pool<Postgres> {
   let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_SQLX");
 
   let db_pool = PgPoolOptions::new()

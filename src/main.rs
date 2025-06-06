@@ -4,7 +4,7 @@ use axum::{
   Router,
   http::{
     HeaderValue,
-    header::{AUTHORIZATION, CONTENT_TYPE},
+    header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
   },
   middleware::{from_fn, from_fn_with_state},
   routing::{get, post},
@@ -29,11 +29,18 @@ mod users;
 use users::*;
 mod graphql;
 use graphql::*;
+mod entities;
 mod utils;
 
 /*In axum 0.8 changes
   :id  => {id}
 */
+//DO NOT SERIALIZE/DESERIALIZE AppSTATE!
+pub struct AppState {
+  dbp: DatabaseConnection,
+  msg: String,
+  num: i32,
+}
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -53,7 +60,13 @@ async fn main() {
   let pool = sea_orm_db().await;
   //let pool = tokio_postgres1().await;
   //let pool = sqlx_postgres1().await;
-  axum::serve(listener, router(pool))
+  //routes = router(pool)
+  let routes = router(Arc::new(AppState {
+    dbp: pool.clone(),
+    msg: "msg".to_owned(),
+    num: 0,
+  }));
+  axum::serve(listener, routes)
     .await
     .expect("Error at Axum::serve");
 }
@@ -69,17 +82,14 @@ struct SharedUser {
   age: u32,
 }
 
-fn router(pool: DatabaseConnection) -> Router {
-  /*TODO: Axum middleware shares a pool of database connections https://github.com/tokio-rs/axum/discussions/2819
-  let db_client = Arc::new(DbClient { client });
-    let db_pool = Arc::new(DbPool {});
-    let config = Arc::new(Config {});  */
-
+fn router(app_state: Arc<AppState>) -> Router {
+  //pool: DatabaseConnection
   let cors_layer = CorsLayer::new()
     .allow_methods(Any)
-    .allow_headers([CONTENT_TYPE, AUTHORIZATION])
+    .allow_headers([CONTENT_TYPE, AUTHORIZATION, ACCEPT])
     .allow_origin("http://localhost:4000".parse::<HeaderValue>().unwrap());
   //allow_method: [Method::GET, Method::POST]
+  //allow)credentials(true)
 
   let static_files = ServeDir::new("./assets"); // localhost:3000/static/bitcoin.jpg
   let arc_shared_state_mut = Arc::new(Mutex::new(SharedState {
@@ -94,7 +104,7 @@ fn router(pool: DatabaseConnection) -> Router {
     mesg: "sharedState".to_owned(),
     num: 200,
   };
-  let user = SharedUser {
+  let shared_user = SharedUser {
     name: "sharedUser".to_owned(),
     age: 27,
   };
@@ -129,6 +139,7 @@ fn router(pool: DatabaseConnection) -> Router {
     .route("/protected", get(protected).layer(from_fn(auth)))
     .route("/add_with_query_params", post(add_with_query_params))
     .route("/add_with_query_params2", post(add_with_query_params2))
+    .route("/user_by_name/{:name}", get(get_user_by_name))
     .route(
       "/users/{id}",
       get(get_user_by_id)
@@ -163,9 +174,9 @@ fn router(pool: DatabaseConnection) -> Router {
     .merge(route1)
     .fallback(fallback_handler)
     .layer(from_fn(middleware_general))
-    .with_state(pool)
+    .with_state(app_state)
     .route("/get_state_in_handler", get(get_state_handler))
-    .with_state((shared_state, user))
+    .with_state((shared_state, shared_user))
     .route(
       "/mut_shared_state",
       get(get_mut_shared_state_handler).post(post_mut_shared_state_handler),
