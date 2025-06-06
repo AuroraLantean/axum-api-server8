@@ -1,28 +1,34 @@
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{
-  entities::{prelude::*, users::Model, *}, middleware::JwtClaims, model::UserCopied, AppState
-};
 use crate::entities::users::ActiveModel;
+use crate::{
+  AppState,
+  entities::{prelude::*, *},
+  middleware::JwtClaims,
+  model::UserCopied,
+};
 use axum::{
-  Extension, Json, debug_handler,
+  Extension, Json,
   extract::{Path, Query, State},
   http::StatusCode,
   response::IntoResponse,
 };
 use bcrypt;
-use chrono::{FixedOffset, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
 use rust_decimal::prelude::*;
 use sea_orm::*;
 use serde::Deserialize;
+use serde_json::json;
 
+//https://www.sea-ql.org/sea-orm-tutorial/ch01-05-basic-crud-operations.html
+//https://www.sea-ql.org/sea-orm-tutorial/ch01-08-sql-with-sea-query.html
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct FromUser {
   name: String,
   password: Option<String>,
-  email: String,
+  email: Option<String>,
   occupation: Option<String>,
   phone: Option<String>,
   level: Option<i32>,
@@ -33,6 +39,11 @@ pub async fn add_user(
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("add_user: {:?}", input);
+  let email = if let Some(email) = input.email {
+    email
+  } else {
+    return (StatusCode::BAD_REQUEST, "email invalid");
+  };
   if None == input.password {
     (StatusCode::BAD_REQUEST, "empty password");
   }
@@ -44,17 +55,18 @@ pub async fn add_user(
   };
   println!("hashed_pw: {:?}", hashed_pw);
 
+  //https://www.sea-ql.org/SeaORM/docs/basic-crud/insert/#insert-one
   let user1 = ActiveModel {
     name: Set(input.name),
     password: Set(hashed_pw),
-    email: Set(input.email),
-    level: Set(1),
+    email: Set(email),
+    level: Set(0),
     ..Default::default()
-  }; //id: Uuid::new_v4().to_string(),
+  }; //ActiveValue::NotSet,
+  //id: Uuid::new_v4().to_string(),
   //balance: Decimal::from_str(&balc_str);
   //balance: dec!(0),
   //updated_at: OffsetDateTime::now_utc(),
-  //println!("{:?}", user1);
 
   let result = user1.insert(&state.dbp).await;
   //("INSERT INTO users (name, password) VALUES ($1, $2) RETURNING *", name, password)
@@ -63,7 +75,7 @@ pub async fn add_user(
     Ok(model) => {
       println!("model: {:?}", model);
       (StatusCode::CREATED, "Success")
-    },
+    }
     Err(err) => {
       eprintln!("DB error: {}", err);
       (StatusCode::INTERNAL_SERVER_ERROR, "db insert")
@@ -106,6 +118,7 @@ pub async fn get_user_by_id(
   println!("get_user_by_id");
   let id_i32 = id.parse::<i32>().expect("parse id to i32");
   let user_option = Users::find_by_id(id_i32)
+    .into_json()
     .one(&state.dbp)
     .await
     .expect("find_by_id");
@@ -113,7 +126,7 @@ pub async fn get_user_by_id(
   if let Some(user) = user_option {
     println!("user: {:?}", user);
     //serde_json::to_string_pretty(&user).unwrap()
-    (StatusCode::OK, "Json(user)").into_response()
+    (StatusCode::OK, Json(user)).into_response()
   } else {
     (StatusCode::OK, "None found").into_response()
   }
@@ -124,24 +137,38 @@ pub async fn get_user_by_name(
 ) -> impl IntoResponse {
   //Result<impl IntoResponse,(StatusCode, Json<Value>)
   println!("get_user_by_name");
-  let user_option = Users::find().filter(users::Column::Name.eq(name))
+  let user_option = Users::find()
+    .filter(users::Column::Name.eq(name))
+    .into_json()
     .one(&state.dbp)
     .await
     .expect("get_user_by_name");
   println!("user: {:?}", user_option);
   if let Some(user) = user_option {
     println!("user: {:?}", user);
-    (StatusCode::OK, "Json(user) not ready").into_response()
+    (StatusCode::OK, Json(user)).into_response()
   } else {
     (StatusCode::OK, "None found").into_response()
   }
 }
+#[axum::debug_handler]
 pub async fn get_users(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+  //the trait bound `Vec<serde_json::Value>: IntoResponse` is not satisfied
   println!("get_users");
-  let all_users = Users::find().all(&state.dbp).await.unwrap();
   println!("state: {} {}", state.msg, state.num);
-  println!("all_users: {:?}", all_users);
-  (StatusCode::OK, "TODO").into_response()
+  let result = Users::find().into_json().all(&state.dbp).await;
+
+  match result {
+    Ok(users) => {
+      println!("users: {:?}", users);
+      let json_str = serde_json::to_string_pretty(&users).expect("serde_json::to_string");
+      (StatusCode::OK, json_str)
+    }
+    Err(err) => {
+      println!("err: {:?}", err);
+      (StatusCode::OK, err.to_string())
+    }
+  }
 }
 
 pub async fn login(
@@ -151,18 +178,22 @@ pub async fn login(
   println!("login: {:?}", input);
 
   let user_option = Users::find()
+    .filter(users::Column::Name.eq(input.name))
     .one(&state.dbp)
     .await
-    .unwrap();
-  println!("user: {:?}", user_option);
-  if let Some(user) = user_option {
-    //(StatusCode::OK, Json(user)).into_response()
+    .expect("get_user_by_name"); //No JSON!
+
+  let user = if let Some(user) = user_option {
+    println!("user: {:?}", user);
+    user
   } else {
-    //(StatusCode::OK, "None found").into_response()
-  }
-  
-  /*
-  let hash_pw: String = rows[0].get(2); //password is at index 2
+    return (StatusCode::OK, "None found").into_response();
+  };
+  println!("user: {:?}", user);
+  let hash_pw: String = user.password;
+  //(StatusCode::OK, "").into_response()
+  //let hash_pw: String = rows[0].get(2); //password is at index 2
+
   let is_valid = if let Some(password) = input.password {
     let result = bcrypt::verify(password, &hash_pw);
     if let Ok(boo) = result {
@@ -174,7 +205,7 @@ pub async fn login(
     return (StatusCode::BAD_REQUEST, "empty password").into_response();
   };
   if is_valid {
-    let name = rows[0].get(1);
+    let name = user.name; // rows[0].get(1);
     let jwt_claim = JwtClaims {
       sub: name,
       exp: SystemTime::now()
@@ -205,8 +236,7 @@ pub async fn login(
       .into_response()
   } else {
     (StatusCode::UNAUTHORIZED, "Invalid password").into_response()
-  }*/
-  (StatusCode::OK, "TODO")
+  }
 }
 
 // to receive request from auth middleware
@@ -215,6 +245,7 @@ pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse 
   (StatusCode::OK, res)
 }
 
+//https://www.sea-ql.org/SeaORM/docs/basic-crud/select/#paginate-result
 #[derive(Debug, Deserialize, Default)]
 pub struct Pagination {
   //#[serde(default, deserialize_with = "empty_string_as_none")]
@@ -222,11 +253,26 @@ pub struct Pagination {
   pub limit: Option<usize>,
 }
 //{{host}}/users?offset=1&limit=100
-pub async fn query_with_pagination(pagination: Query<Pagination> /*, State(db): State<Db> */) {
+pub async fn query_with_pagination(
+  State(state): State<Arc<AppState>>,
+  pagination: Query<Pagination>, /*, State(db): State<Db> */
+) {
   println!("pagination: {:?} {:?}", pagination.offset, pagination.limit);
   let limit = pagination.limit.unwrap_or(10);
   let _offset = pagination.offset.unwrap_or(0) * limit;
-  let _query_result = "SELECT * FROM users ORDER by id LIMIT $1 OFFSET $2";//limit as i32, offset as i32
+
+  let mut pages: Paginator<_, _> = Users::find()
+    .filter(users::Column::Name.contains("John"))
+    .order_by_asc(users::Column::Name)
+    .into_json()
+    .paginate(&state.dbp, 50);
+
+  while let Some(user) = pages.fetch_and_next().await.unwrap() {
+    println!("user: {:?}", user);
+    //Vec<serde_json::Value>
+  }
+
+  //let _query_result = "SELECT * FROM users ORDER by id LIMIT $1 OFFSET $2";//limit as i32, offset as i32
   /*let users = users
       .values()
       .skip(pagination.offset.unwrap_or(0))
@@ -251,12 +297,10 @@ pub async fn patch_user(
   println!("patch_user: {:?}", input);
   let id_i32 = id.parse::<i32>().expect("parse id to i32");
 
-  let user_option = Users::find_by_id(id_i32)
-    .one(&state.dbp)
-    .await
-    .unwrap();
+  let user_option = Users::find_by_id(id_i32).one(&state.dbp).await.unwrap();
   //("UPDATE users SET password = $1, email = $2 WHERE id = $3 RETURNING *", password, email, id)
 
+  //https://www.sea-ql.org/SeaORM/docs/basic-crud/update/ ... convert from Model into an ActiveModel first.
   let mut user: ActiveModel = if let Some(user) = user_option {
     user.into()
   } else {
@@ -277,11 +321,19 @@ pub async fn patch_user(
     let balance_dec = Decimal::from_str(balc_str.as_str()).expect("convert String to Decimal");
     user.balance = Set(balance_dec);
   }
-  let new_model = user.update(&state.dbp).await.unwrap();
-
-  println!("new user: {:?}", new_model);
-  (StatusCode::OK, "Json(new_model)").into_response()
+  let result = user.update(&state.dbp).await;
+  match result {
+    Ok(new_model) => {
+      println!("new user: {:?}", new_model);
+      (StatusCode::OK, "success").into_response()
+    }
+    Err(err) => {
+      eprintln!("DB error: {}", err);
+      (StatusCode::INTERNAL_SERVER_ERROR, "error").into_response()
+    }
+  }
 }
+
 pub async fn delete_user(
   State(state): State<Arc<AppState>>,
   Path(id): Path<String>,
@@ -298,39 +350,40 @@ pub async fn delete_user(
     Ok(res) => {
       println!("rows_affected: {}", res.rows_affected);
       (StatusCode::OK, "success")
-    },
+    }
     Err(err) => {
-    eprintln!("DB error: {}", err);
-    (StatusCode::INTERNAL_SERVER_ERROR, "error")
+      eprintln!("DB error: {}", err);
+      (StatusCode::INTERNAL_SERVER_ERROR, "error")
+    }
+  }
+}
+pub async fn delete_many_users(
+  State(state): State<Arc<AppState>>,
+  Path(name): Path<String>,
+) -> impl IntoResponse {
+  let result = users::Entity::delete_many()
+    .filter(users::Column::Name.contains(name))
+    .exec(&state.dbp)
+    .await;
+  //("DELETE FROM users * WHERE name = $1")
+  match result {
+    Ok(res) => {
+      println!("rows_affected: {}", res.rows_affected);
+      (StatusCode::OK, "success")
+    }
+    Err(err) => {
+      eprintln!("DB error: {}", err);
+      (StatusCode::INTERNAL_SERVER_ERROR, "error")
     }
   }
 }
 
 //Use patch_user instead, bcos you should fetch to see if the user exist first!
 pub async fn put_user(
-  State(state): State<Arc<AppState>>,
-  Path(id): Path<String>,
+  State(_state): State<Arc<AppState>>,
+  Path(_id): Path<String>,
   Json(input): Json<FromUser>,
 ) -> impl IntoResponse {
   println!("put_user: {:?}", input);
-  let id_i32 = id.parse::<i32>().expect("parse id to i32");
-  let hashed_pw = bcrypt::hash(input.password.unwrap_or("".to_owned()), 10).expect("hash password");
-
-  /*let _user = ActiveModel {
-    id: id_i32,
-    name: input.name,
-    password: hashed_pw,
-    occupation: Some(input.occupation.unwrap_or_default()),
-    email: input.email,
-    phone: Some(input.phone.unwrap_or_default()),
-    level: input.level.unwrap_or_default(),
-    balance: input.balance.unwrap_or_default(),
-    updated_at: Utc::now().with_timezone(&FixedOffset::east_opt(0).unwrap()),
-  };
-  //let new_model = Model::update(&state.dbp).await.unwrap();
-  //println!("new user: {:?}", new_model);
-  //db.write().unwrap().insert(user.id, user.clone());
-  //(StatusCode::OK, Json(new_model))
-  */
   (StatusCode::OK, "TODO")
 }

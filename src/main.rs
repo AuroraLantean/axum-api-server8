@@ -7,7 +7,7 @@ use axum::{
     header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE},
   },
   middleware::{from_fn, from_fn_with_state},
-  routing::{get, post},
+  routing::{delete, get, post},
 };
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
@@ -147,6 +147,7 @@ fn router(app_state: Arc<AppState>) -> Router {
         .patch(patch_user)
         .delete(delete_user),
     )
+    .route("/delete_many_users", delete(delete_many_users))
     .route("/users/{user_id}/teams/{team_id}", get(customized_path))
     .route("/", post(post_raw1))
     .route("/dynamic_json_output/{id}", get(dynamic_json_output))

@@ -61,7 +61,7 @@ postgres=# \dt  ... find all tables
 
 postgres=# \dt  ... find all tables
 postgres=# \q
-```
+
 ## Generate SeaORM Entity from Database
 ```
 $ cargo install sea-orm-cli
