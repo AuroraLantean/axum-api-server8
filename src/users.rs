@@ -153,6 +153,7 @@ pub async fn get_users(
   let result = Users::find().all(&state.dbp).await?; // .into_json()
   Ok(Json(result))
 }
+
 #[axum::debug_handler]
 pub async fn login(
   State(state): State<Arc<AppState>>,
