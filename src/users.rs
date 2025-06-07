@@ -2,11 +2,12 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::entities::users::ActiveModel;
+use crate::utils::{DbErrOut, db_err};
 use crate::{
   AppState,
   entities::{prelude::*, *},
   middleware::JwtClaims,
-  model::UserCopied,
+  model::UserB,
 };
 use axum::{
   Extension, Json,
@@ -16,7 +17,7 @@ use axum::{
 };
 use bcrypt;
 use jsonwebtoken::{EncodingKey, Header, encode};
-use rust_decimal::prelude::*;
+use sea_orm::prelude::*;
 use sea_orm::*;
 use serde::Deserialize;
 use serde_json::json;
@@ -34,24 +35,26 @@ pub struct FromUser {
   level: Option<i32>,
   balance: Option<Decimal>,
 } //in postman: Body > raw: {...}
+#[axum::debug_handler]
 pub async fn add_user(
   State(state): State<Arc<AppState>>,
   Json(input): Json<FromUser>,
-) -> impl IntoResponse {
+) -> Result<String, DbErrOut> {
+  //impl IntoResponse
   println!("add_user: {:?}", input);
   let email = if let Some(email) = input.email {
     email
   } else {
-    return (StatusCode::BAD_REQUEST, "email invalid");
+    return Err(db_err("email invalid"));
   };
   if None == input.password {
-    (StatusCode::BAD_REQUEST, "empty password");
+    return Err(db_err("password invalid"));
   }
   let hashed_result = bcrypt::hash(input.password.unwrap(), 10);
   let hashed_pw = if let Ok(hashed_pw) = hashed_result {
     hashed_pw
   } else {
-    return (StatusCode::INTERNAL_SERVER_ERROR, "bcrypt hash error");
+    return Err(db_err("bcrypt hash error"));
   };
   println!("hashed_pw: {:?}", hashed_pw);
 
@@ -68,25 +71,16 @@ pub async fn add_user(
   //balance: dec!(0),
   //updated_at: OffsetDateTime::now_utc(),
 
-  let result = user1.insert(&state.dbp).await;
+  user1.insert(&state.dbp).await?;
   //("INSERT INTO users (name, password) VALUES ($1, $2) RETURNING *", name, password)
-
-  match result {
-    Ok(model) => {
-      println!("model: {:?}", model);
-      (StatusCode::CREATED, "Success")
-    }
-    Err(err) => {
-      eprintln!("DB error: {}", err);
-      (StatusCode::INTERNAL_SERVER_ERROR, "db insert")
-    }
-  }
+  //eprintln!("DB error: {}", err);
+  Ok("success".to_owned())
 }
 
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params(
   State(_client): State<Arc<AppState>>,
-  Query(mut user): Query<UserCopied>,
+  Query(mut user): Query<UserB>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}", user);
   user.occupation = Some("what job?".to_owned());
@@ -101,7 +95,7 @@ pub struct Referal {
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params2(
   State(_client): State<Arc<AppState>>,
-  Query(mut user): Query<UserCopied>,
+  Query(mut user): Query<UserB>,
   Query(referal): Query<Referal>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}, referal: {:?}", user, referal);
@@ -113,85 +107,72 @@ pub async fn add_with_query_params2(
 pub async fn get_user_by_id(
   State(state): State<Arc<AppState>>,
   Path(id): Path<String>,
-) -> impl IntoResponse {
-  //Result<impl IntoResponse,(StatusCode, Json<Value>)
+) -> Result<users::Model, DbErrOut> {
   println!("get_user_by_id");
-  let id_i32 = id.parse::<i32>().expect("parse id to i32");
-  let user_option = Users::find_by_id(id_i32)
-    .into_json()
-    .one(&state.dbp)
-    .await
-    .expect("find_by_id");
+  let id_i32 = id.parse::<i32>();
+  if id_i32.is_err() {
+    return Err(db_err("parse id to i32"));
+  };
+  let user_option = Users::find_by_id(id_i32.unwrap()).one(&state.dbp).await?; //.into_json()
+
   println!("user: {:?}", user_option);
   if let Some(user) = user_option {
     println!("user: {:?}", user);
-    //serde_json::to_string_pretty(&user).unwrap()
-    (StatusCode::OK, Json(user)).into_response()
+    Ok(user)
   } else {
-    (StatusCode::OK, "None found").into_response()
+    Err(db_err("Not found"))
   }
 }
+
+#[axum::debug_handler]
 pub async fn get_user_by_name(
   State(state): State<Arc<AppState>>,
   Path(name): Path<String>,
-) -> impl IntoResponse {
-  //Result<impl IntoResponse,(StatusCode, Json<Value>)
+) -> Result<users::Model, DbErrOut> {
   println!("get_user_by_name");
   let user_option = Users::find()
     .filter(users::Column::Name.eq(name))
-    .into_json()
     .one(&state.dbp)
-    .await
-    .expect("get_user_by_name");
+    .await?; //.into_json()
   println!("user: {:?}", user_option);
   if let Some(user) = user_option {
     println!("user: {:?}", user);
-    (StatusCode::OK, Json(user)).into_response()
+    Ok(user)
   } else {
-    (StatusCode::OK, "None found").into_response()
+    Err(db_err("Not found"))
   }
 }
+
 #[axum::debug_handler]
-pub async fn get_users(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-  //the trait bound `Vec<serde_json::Value>: IntoResponse` is not satisfied
+pub async fn get_users(
+  State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<users::Model>>, DbErrOut> {
+  // Json(json!({ "data": 42 })) : Json<Value>
   println!("get_users");
   println!("state: {} {}", state.msg, state.num);
-  let result = Users::find().into_json().all(&state.dbp).await;
-
-  match result {
-    Ok(users) => {
-      println!("users: {:?}", users);
-      let json_str = serde_json::to_string_pretty(&users).expect("serde_json::to_string");
-      (StatusCode::OK, json_str)
-    }
-    Err(err) => {
-      println!("err: {:?}", err);
-      (StatusCode::OK, err.to_string())
-    }
-  }
+  let result = Users::find().all(&state.dbp).await?; // .into_json()
+  Ok(Json(result))
 }
-
+#[axum::debug_handler]
 pub async fn login(
   State(state): State<Arc<AppState>>,
   Json(input): Json<FromUser>,
-) -> impl IntoResponse {
+) -> Result<Json<JsonValue>, DbErrOut> {
   println!("login: {:?}", input);
 
   let user_option = Users::find()
     .filter(users::Column::Name.eq(input.name))
     .one(&state.dbp)
-    .await
-    .expect("get_user_by_name"); //No JSON!
+    .await?; //No JSON!
 
   let user = if let Some(user) = user_option {
     println!("user: {:?}", user);
     user
   } else {
-    return (StatusCode::OK, "None found").into_response();
+    return Err(db_err("None found"));
   };
   println!("user: {:?}", user);
   let hash_pw: String = user.password;
-  //(StatusCode::OK, "").into_response()
   //let hash_pw: String = rows[0].get(2); //password is at index 2
 
   let is_valid = if let Some(password) = input.password {
@@ -199,47 +180,46 @@ pub async fn login(
     if let Ok(boo) = result {
       boo
     } else {
-      return (StatusCode::BAD_REQUEST, "invalid password").into_response();
+      return Err(db_err("Invalid password"));
     }
   } else {
-    return (StatusCode::BAD_REQUEST, "empty password").into_response();
+    return Err(db_err("Empty password"));
   };
   if is_valid {
     let name = user.name; // rows[0].get(1);
+    let exp_time = SystemTime::now().duration_since(UNIX_EPOCH);
+    if exp_time.is_err() {
+      return Err(db_err("duration_since"));
+    }
     let jwt_claim = JwtClaims {
       sub: name,
-      exp: SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 60 * 60, // 1 hour valid JWT
+      exp: exp_time.unwrap().as_secs() + 60 * 60, // 1 hour valid JWT
     };
-    let jwt_secret = dotenvy::var("JWT_SECRET").expect("JWT_SECRET not found in .env");
-
+    let jwt_secret = dotenvy::var("JWT_SECRET");
+    if jwt_secret.is_err() {
+      return Err(db_err("JWT_SECRET not found in .env"));
+    }
     let jwt_result = encode(
       &Header::default(),
       &jwt_claim,
-      &EncodingKey::from_secret(jwt_secret.as_bytes()),
+      &EncodingKey::from_secret(jwt_secret.unwrap().as_bytes()),
     );
     let jwt_token = if let Ok(jwt_token) = jwt_result {
       jwt_token
     } else {
-      return (StatusCode::INTERNAL_SERVER_ERROR, "jwt encoding error").into_response();
+      return Err(db_err("jwt encoding error"));
     };
-    (
-      StatusCode::OK,
-      Json(json!({
-        "result": "success",
-        "jwt_token": jwt_token,
-      })),
-    )
-      .into_response()
+    Ok(Json(json!({
+      "result": "success",
+      "jwt_token": jwt_token,
+    })))
   } else {
-    (StatusCode::UNAUTHORIZED, "Invalid password").into_response()
+    Err(db_err("Invalid password"))
   }
 }
 
 // to receive request from auth middleware
+#[axum::debug_handler]
 pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse {
   let res = format!("Hello {}", name);
   (StatusCode::OK, res)
@@ -253,6 +233,7 @@ pub struct Pagination {
   pub limit: Option<usize>,
 }
 //{{host}}/users?offset=1&limit=100
+#[axum::debug_handler]
 pub async fn query_with_pagination(
   State(state): State<Arc<AppState>>,
   pagination: Query<Pagination>, /*, State(db): State<Db> */
@@ -289,22 +270,25 @@ pub struct PatchUser {
   phone: Option<String>,
   balance: Option<String>,
 }
+#[axum::debug_handler]
 pub async fn patch_user(
   State(state): State<Arc<AppState>>,
   Path(id): Path<String>,
   Json(input): Json<PatchUser>,
-) -> impl IntoResponse {
+) -> Result<users::Model, DbErrOut> {
   println!("patch_user: {:?}", input);
-  let id_i32 = id.parse::<i32>().expect("parse id to i32");
-
-  let user_option = Users::find_by_id(id_i32).one(&state.dbp).await.unwrap();
+  let id_i32 = id.parse::<i32>();
+  if id_i32.is_err() {
+    return Err(db_err("parse id to i32"));
+  };
+  let user_option = Users::find_by_id(id_i32.unwrap()).one(&state.dbp).await?;
   //("UPDATE users SET password = $1, email = $2 WHERE id = $3 RETURNING *", password, email, id)
 
   //https://www.sea-ql.org/SeaORM/docs/basic-crud/update/ ... convert from Model into an ActiveModel first.
   let mut user: ActiveModel = if let Some(user) = user_option {
     user.into()
   } else {
-    return (StatusCode::OK, "None found").into_response();
+    return Err(db_err("None found"));
   };
 
   println!("old user: {:?}", user);
@@ -318,72 +302,56 @@ pub async fn patch_user(
     user.phone = Set(Some(phone));
   }
   if let Some(balc_str) = input.balance {
-    let balance_dec = Decimal::from_str(balc_str.as_str()).expect("convert String to Decimal");
-    user.balance = Set(balance_dec);
-  }
-  let result = user.update(&state.dbp).await;
-  match result {
-    Ok(new_model) => {
-      println!("new user: {:?}", new_model);
-      (StatusCode::OK, "success").into_response()
+    let balance_dec = Decimal::try_from(balc_str.as_str());
+    if balance_dec.is_err() {
+      return Err(db_err("convert String to Decimal"));
     }
-    Err(err) => {
-      eprintln!("DB error: {}", err);
-      (StatusCode::INTERNAL_SERVER_ERROR, "error").into_response()
-    }
+    user.balance = Set(balance_dec.unwrap());
   }
+  let new_model = user.update(&state.dbp).await?;
+  Ok(new_model)
 }
 
+#[axum::debug_handler]
 pub async fn delete_user(
   State(state): State<Arc<AppState>>,
   Path(id): Path<String>,
-) -> impl IntoResponse {
-  let id = id.parse::<i32>().expect("id i32");
+) -> Result<String, DbErrOut> {
+  let id_i32 = id.parse::<i32>();
+  if id_i32.is_err() {
+    return Err(db_err("parse id to i32"));
+  };
   let user = ActiveModel {
-    id: ActiveValue::Set(id),
+    id: ActiveValue::Set(id_i32.unwrap()),
     ..Default::default()
   };
-  let result = user.delete(&state.dbp).await;
+  let result = user.delete(&state.dbp).await?;
   //("DELETE FROM users WHERE id = $1", id)
   //("DELETE FROM users *")
-  match result {
-    Ok(res) => {
-      println!("rows_affected: {}", res.rows_affected);
-      (StatusCode::OK, "success")
-    }
-    Err(err) => {
-      eprintln!("DB error: {}", err);
-      (StatusCode::INTERNAL_SERVER_ERROR, "error")
-    }
-  }
+  //result.rows_affected
+  Ok(format!("success. rows_affected: {}", result.rows_affected))
 }
+
+#[axum::debug_handler]
 pub async fn delete_many_users(
   State(state): State<Arc<AppState>>,
   Path(name): Path<String>,
-) -> impl IntoResponse {
+) -> Result<String, DbErrOut> {
   let result = users::Entity::delete_many()
     .filter(users::Column::Name.contains(name))
     .exec(&state.dbp)
-    .await;
+    .await?;
   //("DELETE FROM users * WHERE name = $1")
-  match result {
-    Ok(res) => {
-      println!("rows_affected: {}", res.rows_affected);
-      (StatusCode::OK, "success")
-    }
-    Err(err) => {
-      eprintln!("DB error: {}", err);
-      (StatusCode::INTERNAL_SERVER_ERROR, "error")
-    }
-  }
+  Ok(format!("success. rows_affected: {}", result.rows_affected))
 }
 
 //Use patch_user instead, bcos you should fetch to see if the user exist first!
+#[axum::debug_handler]
 pub async fn put_user(
   State(_state): State<Arc<AppState>>,
   Path(_id): Path<String>,
   Json(input): Json<FromUser>,
-) -> impl IntoResponse {
+) -> Result<String, DbErrOut> {
   println!("put_user: {:?}", input);
-  (StatusCode::OK, "TODO")
+  Ok("success".to_owned())
 }

@@ -12,7 +12,6 @@ use axum::{
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
-//use tokio_postgres::Client;
 use tower_http::{
   cors::{Any, CorsLayer},
   services::ServeDir,
@@ -34,13 +33,17 @@ mod utils;
 
 /*In axum 0.8 changes
   :id  => {id}
+
+TODO: add handler that returns Result<>, so to exercise "?" returning Err() ... see example at Axum examples/anyhow for errors, and error-handling ... Result<AppJson<User>, String>
+
+See JWT example to make your own error
 */
 //DO NOT SERIALIZE/DESERIALIZE AppSTATE!
 pub struct AppState {
   dbp: DatabaseConnection,
   msg: String,
   num: i32,
-}
+} //TODO: should we put Arc() inside AppState?
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -57,7 +60,7 @@ async fn main() {
     .expect("Could not add tcp listener");
   println!("server running on {server_addr:?}");
 
-  let pool = sea_orm_db().await;
+  let pool = sea_orm_db().await.unwrap();
   //let pool = tokio_postgres1().await;
   //let pool = sqlx_postgres1().await;
   //routes = router(pool)
@@ -66,9 +69,7 @@ async fn main() {
     msg: "msg".to_owned(),
     num: 0,
   }));
-  axum::serve(listener, routes)
-    .await
-    .expect("Error at Axum::serve");
+  axum::serve(listener, routes).await.unwrap();
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -215,8 +216,8 @@ fn router(app_state: Arc<AppState>) -> Router {
     FLOAT4 <=> f32
     FLOAT8 <=> f64
     VARCHAR <=> String, &str
-    Numeric <=> rust_decimal::Decimal, or bigdecimal::BigDecimal
-    timetz  <=> DateTimeWithTimeZone from chrono::DateTime<FixedOffset>
+    Numeric <=> rust_decimal::Decimal, or bigdecimal::BigDecimal (those crates are included in SeaORM features)
+    timetz  <=> DateTimeWithTimeZone from chrono::DateTime<FixedOffset>, included in SeaORM features
 
     https://github.com/sfackler/rust-postgres/blob/c5ff8cfd86e897b7c197f52684a37a4f17cecb75/postgres-types/src/lib.rs#L727
 

@@ -40,7 +40,7 @@ pub async fn _tokio_postgres1() -> _BB8Pool {
 //https://www.sea-ql.org/SeaORM/docs/install-and-config/connection/
 //Each time you call execute or query_one/all on it, a connection will be acquired and released from the pool.
 pub type SeaPool = DatabaseConnection;
-pub async fn sea_orm_db() -> SeaPool {
+pub async fn sea_orm_db() -> Result<SeaPool, sea_orm::DbErr> {
   let conn_str = get_db_connn_str("DB_POSTGRES_DOCKER_SQLX");
   //db_uri should be protocol://username:password@host/database
   let mut opt = ConnectOptions::new(conn_str);
@@ -55,7 +55,7 @@ pub async fn sea_orm_db() -> SeaPool {
     .sqlx_logging_level(log::LevelFilter::Info);
   //.set_schema_search_path("my_schema"); // Setting default PostgreSQL schema
 
-  let db_conn = Database::connect(opt).await.expect("sea_orm connect");
+  let db_conn = Database::connect(opt).await;
   db_conn
 }
 pub async fn _sqlx_postgres1() -> Pool<Postgres> {

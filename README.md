@@ -32,6 +32,7 @@ postgres=# SELECT * FROM users;
 
 
 ### Manual setup via CLI
+```
 $ docker volume create postgres1-data
 $ docker run --name postgres1 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=admin -e POSTGRES_DB=db_name1 -d -p 5431:5432 -v postgres1-data:/var/lib/postgresql/data postgres:latest
 
@@ -61,6 +62,7 @@ postgres=# \dt  ... find all tables
 
 postgres=# \dt  ... find all tables
 postgres=# \q
+```
 
 ## Generate SeaORM Entity from Database
 ```
@@ -69,7 +71,9 @@ $ sea-orm-cli generate entity \
     -u [YOUR POSTGRES SQLX URL] \
     -o src/entities
 ```
- 
+in the Entity file, add `use serde::{Deserialize, Serialize};` to that Model; And implement `IntoResponse`
+
+
 ## Docker Container Management
 ```
 $ docker stop postgres1
@@ -85,8 +89,9 @@ $ docker ps -a
 async-trait: Type erasure for async trait methods 
 axum and axum-extra: web framework built with Tokio, Tower, and Hyper; Extra utilities for Axum
 
-chrono: for DB timestamps
-time: to compliment chronos
+rust_decimal: included in SeaORM
+chrono: for DB timestamps ... included in SeaORM
+//time: to compliment chronos
 
 dotenvy: A well-maintained fork of the dotenv
 jsonwebtoken: to make json web token
@@ -101,14 +106,32 @@ tracing-subscriber: for collecting structured event logs
 uuid: for unique identifier
 validator: validation for data models
 
+## Reference
+SeaORM https://github.com/SeaQL/sea-orm
+Tokio https://github.com/tokio-rs/axum
+
+
+## Installation
+install terminator
+
+install slumber http client
+
+install just command runner
+
+install Rust 1.87.0 (17067e9ac 2025-05-09)
+
+```
+cargo install cargo-watch
+```
+
+## Run
+Start Terminator: `just term`
+
+Run the server: `just watch`
+
+Start Slumber to make requests: `slumber`
+
 ## TODO
-https://github.com/tokio-rs/axum
-
-Envy to serialize env vars into structs
-https://github.com/softprops/envy
-
-https://medium.com/@mikecode/rust-axum-create-user-log-in-user-crypt-password-verify-password-connect-to-database-69c65a3c10b4
-
 query-params-with-empty-strings
 customize-path-rejection
 get header request-id
@@ -122,21 +145,19 @@ handle-head-request
 global-404-handler
 error-handling
 
-form, cors, jwt
 consume-body-in-extractor-or-middleware
 
 print-request-response
 tracing-aka-logging
 tls-graceful-shutdown
 
-PostgreSQL
+Rust Postgres Driver
 https://github.com/sfackler/rust-postgres
-https://medium.com/@mikecode/rust-how-to-connect-to-postgresql-f39ba1497b2a
+
 diesel-postgrestodo, diesel-async-postgres
 tokio-postgres,
 sqlx-postgres
 
-auto-reload
 testing
 dependency-injection
 
@@ -146,10 +167,6 @@ https://github.com/tokio-rs/axum/blob/main/ECOSYSTEM.md#tutorials
 Neon Postgres https://neon.tech/docs/guides/rust
 Shuttle Postgres https://docs.shuttle.dev/resources/shuttle-shared-db
 Render https://render.com/docs/deploy-rocket-rust
-
-Other POstgres Hosts
-https://medium.com/@nile.bits/top-10-affordable-options-to-host-your-postgresql-database-6cf103fe40b4
-
 
 JWT, Socket, gRPC
 Socketioxide: Socket.io implementation in Rust
@@ -189,23 +206,3 @@ https://www.youtube.com/watch?v=HEhhWL1oUTM
 
 Deployment with Shuttle
 https://docs.shuttle.dev/examples/axum
-
-## Installation
-install terminator
-
-install slumber http client
-
-install just command runner
-
-install Rust 1.87.0 (17067e9ac 2025-05-09)
-
-```
-cargo install cargo-watch
-```
-
-## Run
-Start Terminator: `just term`
-
-Run the server: `just watch`
-
-Start Slumber to make requests: `slumber`
