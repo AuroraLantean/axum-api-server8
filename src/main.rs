@@ -23,7 +23,6 @@ mod middleware;
 use middleware::*;
 mod database;
 use database::*;
-mod model;
 mod users;
 use users::*;
 mod graphql;

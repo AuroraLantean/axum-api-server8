@@ -7,7 +7,6 @@ use crate::{
   AppState,
   entities::{prelude::*, *},
   middleware::JwtClaims,
-  model::UserB,
 };
 use axum::{
   Extension, Json,
@@ -19,8 +18,23 @@ use bcrypt;
 use jsonwebtoken::{EncodingKey, Header, encode};
 use sea_orm::prelude::*;
 use sea_orm::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+//-----------== Sea ORM Model:
+/*USE SeaORM CLI to generate the entity model first: https://www.sea-ql.org/SeaORM/docs/generate-entity/sea-orm-cli/
+
+Then copy it to this file to make the UserInput struct below, then delete some fields like id, level, ...
+
+Data Types conversion between Postgres and Rust https://www.sea-ql.org/SeaORM/docs/generate-entity/entity-structure/#column-type */
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserQueryParams {
+  pub name: String,
+  pub password: String,
+  pub email: String,
+  pub occupation: Option<String>,
+  pub phone: Option<String>,
+}
 
 //https://www.sea-ql.org/sea-orm-tutorial/ch01-05-basic-crud-operations.html
 //https://www.sea-ql.org/sea-orm-tutorial/ch01-08-sql-with-sea-query.html
@@ -34,6 +48,7 @@ pub struct FromUser {
   phone: Option<String>,
   level: Option<i32>,
   balance: Option<Decimal>,
+  updated_at: Option<DateTimeWithTimeZone>,
 } //in postman: Body > raw: {...}
 #[axum::debug_handler]
 pub async fn add_user(
@@ -80,7 +95,7 @@ pub async fn add_user(
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params(
   State(_client): State<Arc<AppState>>,
-  Query(mut user): Query<UserB>,
+  Query(mut user): Query<UserQueryParams>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}", user);
   user.occupation = Some("what job?".to_owned());
@@ -95,7 +110,7 @@ pub struct Referal {
 //Must have all param fields or it will fail!
 pub async fn add_with_query_params2(
   State(_client): State<Arc<AppState>>,
-  Query(mut user): Query<UserB>,
+  Query(mut user): Query<UserQueryParams>,
   Query(referal): Query<Referal>,
 ) -> impl IntoResponse {
   println!("add_with_query_params: {:?}, referal: {:?}", user, referal);
