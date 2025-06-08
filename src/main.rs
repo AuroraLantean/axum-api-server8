@@ -33,8 +33,7 @@ mod utils;
 /*In axum 0.8 changes
   :id  => {id}
 
-TODO: add handler that returns Result<>, so to exercise "?" returning Err() ... see example at Axum examples/anyhow for errors, and error-handling ... Result<AppJson<User>, String>
-
+TODO: see example at Axum examples/anyhow for errors, and error-handling ...
 See JWT example to make your own error
 */
 //DO NOT SERIALIZE/DESERIALIZE AppSTATE!
@@ -134,7 +133,7 @@ fn router(app_state: Arc<AppState>) -> Router {
     .route("/query_params", get(query_params))
     .route("/request_params", get(request_params).post(request_params))
     .route("/users", get(query_with_pagination).post(add_user))
-    .route("/user_get_many", get(get_users))
+    .route("/get_all_users", get(get_all_users))
     .route("/login", post(login))
     .route("/protected", get(protected).layer(from_fn(auth)))
     .route("/add_with_query_params", post(add_with_query_params))
@@ -147,7 +146,11 @@ fn router(app_state: Arc<AppState>) -> Router {
         .patch(patch_user)
         .delete(delete_user),
     )
-    .route("/delete_many_users", delete(delete_many_users))
+    .route(
+      "/delete_partial_name_users",
+      delete(delete_partial_name_users),
+    )
+    .route("/delete_all_users", delete(delete_all_users))
     .route("/users/{user_id}/teams/{team_id}", get(customized_path))
     .route("/", post(post_raw1))
     .route("/dynamic_json_output/{id}", get(dynamic_json_output))

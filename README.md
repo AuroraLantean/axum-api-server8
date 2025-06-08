@@ -108,6 +108,7 @@ validator: validation for data models
 
 ## Reference
 SeaORM https://github.com/SeaQL/sea-orm
+
 Tokio https://github.com/tokio-rs/axum
 
 
@@ -120,9 +121,7 @@ install just command runner
 
 install Rust 1.87.0 (17067e9ac 2025-05-09)
 
-```
-cargo install cargo-watch
-```
+install cargo-watch: `cargo install cargo-watch`
 
 ## Run
 Start Terminator: `just term`
@@ -150,14 +149,6 @@ consume-body-in-extractor-or-middleware
 print-request-response
 tracing-aka-logging
 tls-graceful-shutdown
-
-Rust Postgres Driver
-https://github.com/sfackler/rust-postgres
-
-diesel-postgrestodo, diesel-async-postgres
-tokio-postgres,
-sqlx-postgres
-
 testing
 dependency-injection
 

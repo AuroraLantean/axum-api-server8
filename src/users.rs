@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::entities::users::ActiveModel;
-use crate::utils::{DbErrOut, db_err};
+use crate::utils::{DbErrOut, PaginationOut, db_err};
 use crate::{
   AppState,
   entities::{prelude::*, *},
@@ -159,11 +159,11 @@ pub async fn get_user_by_name(
 }
 
 #[axum::debug_handler]
-pub async fn get_users(
+pub async fn get_all_users(
   State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<users::Model>>, DbErrOut> {
   // Json(json!({ "data": 42 })) : Json<Value>
-  println!("get_users");
+  println!("get_all_users");
   println!("state: {} {}", state.msg, state.num);
   let result = Users::find().all(&state.dbp).await?; // .into_json()
   Ok(Json(result))
@@ -237,46 +237,45 @@ pub async fn login(
 // to receive request from auth middleware
 #[axum::debug_handler]
 pub async fn protected(Extension(name): Extension<String>) -> impl IntoResponse {
-  let res = format!("Hello {}", name);
+  let res = format!("Successful login for {}", name);
   (StatusCode::OK, res)
 }
 
 //https://www.sea-ql.org/SeaORM/docs/basic-crud/select/#paginate-result
 #[derive(Debug, Deserialize, Default)]
-pub struct Pagination {
+pub struct PaginationInput {
   //#[serde(default, deserialize_with = "empty_string_as_none")]
-  pub offset: Option<usize>,
-  pub limit: Option<usize>,
-}
-//{{host}}/users?offset=1&limit=100
+  //#[serde(with = "serde_with::rust::string_empty_as_none")]
+  pub page: Option<u64>,
+  pub amount: Option<u64>,
+} //{{host}}/users?page=1&amount=10
 #[axum::debug_handler]
 pub async fn query_with_pagination(
   State(state): State<Arc<AppState>>,
-  pagination: Query<Pagination>, /*, State(db): State<Db> */
-) {
-  println!("pagination: {:?} {:?}", pagination.offset, pagination.limit);
-  let limit = pagination.limit.unwrap_or(10);
-  let _offset = pagination.offset.unwrap_or(0) * limit;
+  pagination: Query<PaginationInput>,
+) -> Result<PaginationOut, DbErrOut> {
+  println!("pagination: {:?}", pagination);
+  let amount = pagination.amount.unwrap_or(10);
+  let page = pagination.page.unwrap_or(1);
+  if page < 1 {
+    return Err(db_err("page < 1"));
+  };
 
-  let mut pages: Paginator<_, _> = Users::find()
-    .filter(users::Column::Name.contains("John"))
-    .order_by_asc(users::Column::Name)
-    .into_json()
-    .paginate(&state.dbp, 50);
+  let paginator: Paginator<_, _> = Users::find()
+    .order_by_asc(users::Column::Id)
+    .paginate(&state.dbp, amount);
+  //.filter(users::Column::Name.contains("John"))
 
-  while let Some(user) = pages.fetch_and_next().await.unwrap() {
-    println!("user: {:?}", user);
-    //Vec<serde_json::Value>
-  }
+  let num_pages = paginator.num_pages().await?;
+  println!("num_pages: {}", num_pages);
+  // .into_json()
+  let out = paginator.fetch_page(page - 1).await?; //.map(|p| (p, num_pages))?;
+  Ok(PaginationOut(out, num_pages))
 
+  /*while let Some(users) = paginator.fetch_and_next().await? {
+    println!("users: {:?}", users);
+  }*/
   //let _query_result = "SELECT * FROM users ORDER by id LIMIT $1 OFFSET $2";//limit as i32, offset as i32
-  /*let users = users
-      .values()
-      .skip(pagination.offset.unwrap_or(0))
-      .take(pagination.limit.unwrap_or(usize::MAX))
-      .cloned()
-      .collect::<Vec<_>>();
-  Json(users)*/
 }
 
 #[derive(Debug, Deserialize)]
@@ -337,10 +336,18 @@ pub async fn delete_user(
   if id_i32.is_err() {
     return Err(db_err("parse id to i32"));
   };
-  let user = ActiveModel {
-    id: ActiveValue::Set(id_i32.unwrap()),
-    ..Default::default()
+  let user_option = Users::find_by_id(id_i32.unwrap()).one(&state.dbp).await?;
+  //.ok_or(Err(db_err("Not found")))
+  //.map(Into::into)?; //.into_json()
+
+  println!("user: {:?}", user_option);
+  let user = if let Some(user) = user_option {
+    println!("user: {:?}", user);
+    user
+  } else {
+    return Err(db_err("Not found"));
   };
+
   let result = user.delete(&state.dbp).await?;
   //("DELETE FROM users WHERE id = $1", id)
   //("DELETE FROM users *")
@@ -349,7 +356,7 @@ pub async fn delete_user(
 }
 
 #[axum::debug_handler]
-pub async fn delete_many_users(
+pub async fn delete_partial_name_users(
   State(state): State<Arc<AppState>>,
   Path(name): Path<String>,
 ) -> Result<String, DbErrOut> {
@@ -358,6 +365,13 @@ pub async fn delete_many_users(
     .exec(&state.dbp)
     .await?;
   //("DELETE FROM users * WHERE name = $1")
+  Ok(format!("success. rows_affected: {}", result.rows_affected))
+}
+
+#[axum::debug_handler]
+pub async fn delete_all_users(State(state): State<Arc<AppState>>) -> Result<String, DbErrOut> {
+  let result = users::Entity::delete_many().exec(&state.dbp).await?;
+  //("DELETE FROM users *")
   Ok(format!("success. rows_affected: {}", result.rows_affected))
 }
 
