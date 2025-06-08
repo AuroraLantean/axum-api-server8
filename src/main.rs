@@ -41,7 +41,7 @@ pub struct AppState {
   dbp: DatabaseConnection,
   msg: String,
   num: i32,
-} //TODO: should we put Arc() inside AppState?
+}
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -136,6 +136,7 @@ fn router(app_state: Arc<AppState>) -> Router {
     .route("/get_all_users", get(get_all_users))
     .route("/login", post(login))
     .route("/protected", get(protected).layer(from_fn(auth)))
+    .route("/protected2", get(protected2).layer(from_fn(auth)))
     .route("/add_with_query_params", post(add_with_query_params))
     .route("/add_with_query_params2", post(add_with_query_params2))
     .route("/user_by_name/{:name}", get(get_user_by_name))
@@ -232,5 +233,3 @@ fn router(app_state: Arc<AppState>) -> Router {
     Router::new().route("/session_set_handler", get(session_set_handler)).layer(SessionLayer::new(session_store))
     }*/
 }
-
-//TODO:

@@ -1,5 +1,4 @@
 use axum::{
-  Json,
   body::Body,
   http::StatusCode,
   response::{IntoResponse, Response},
@@ -17,7 +16,19 @@ impl IntoResponse for PaginationOut {
     //into_response()
   }
 }
+
+pub fn own(str: &str) -> String {
+  str.to_owned()
+}
 //See Axum examples/anyhow-error
+/*usage:
+pub async fn get_user_by_name(
+  State(state): State<Arc<AppState>>,
+  Path(name): Path<String>,
+) -> Result<users::Model, DbErrOut> {
+  db_call()?;
+} //... ? will take DbErr from the db_call() as argument, and call intoResponse() below
+ */
 pub struct DbErrOut(DbErr);
 impl IntoResponse for DbErrOut {
   fn into_response(self) -> Response {
@@ -33,8 +44,7 @@ where
     Self(err.into())
   }
 }
-
-pub fn db_err(str: &str) -> DbErrOut {
+pub fn _db_err(str: &str) -> DbErrOut {
   DbErrOut(DbErr::Custom(str.to_owned()))
 }
 

@@ -22,6 +22,7 @@ pub async fn middleware_general(req: Request, next: Next) -> impl IntoResponse {
 pub struct JwtClaims {
   pub sub: String, //user name
   pub exp: u64,
+  pub id: i32,
 }
 pub async fn auth(mut req: Request, next: Next) -> impl IntoResponse {
   println!("middleware: auth");
@@ -40,7 +41,9 @@ pub async fn auth(mut req: Request, next: Next) -> impl IntoResponse {
         Ok(token_data) => {
           let claims: JwtClaims = token_data.claims;
           let name = claims.sub;
+          let id = claims.id;
           req.extensions_mut().insert(name);
+          req.extensions_mut().insert(id);
 
           //call the handler
           let response = next.run(req).await;
