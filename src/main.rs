@@ -18,7 +18,9 @@ use proto::calculator_server::CalculatorServer;
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
+use tonic::metadata::MetadataValue;
 use tonic::service::Routes;
+use tonic::{Request, Status};
 use tower_http::{
   cors::{Any, CorsLayer},
   services::ServeDir,
@@ -43,9 +45,16 @@ mod utils;
 TODO: see example at Axum examples/anyhow for errors, and error-handling ...
 See JWT example to make your own error
 */
-
-//DO NOT SERIALIZE/DESERIALIZE AppSTATE!
-//#[derive(Clone, FromRef)]
+//---------== gRPC Interceptor
+// no async... for more advanced middleware, check tower
+fn check_grpc_header(req: Request<()>) -> Result<Request<()>, Status> {
+  let token: MetadataValue<_> = "Bearer secret-token".parse().unwrap();
+  match req.metadata().get("authorization") {
+    Some(t) if token == t => Ok(req),
+    _ => Err(Status::unauthenticated("no valid auth token")),
+  }
+}
+//---------== DO NOT SERIALIZE/DESERIALIZE REST AppSTATE!  //#[derive(Clone, FromRef)]
 pub struct AppState {
   dbp: DatabaseConnection,
   msg: String,
@@ -98,9 +107,9 @@ async fn main() {
   let mut grpc_builder = Routes::builder();
   grpc_builder.add_service(reflection_service);
   grpc_builder.add_service(CalculatorServer::new(calc));
-  grpc_builder.add_service(AdminServer::new(admin));
+  grpc_builder.add_service(AdminServer::with_interceptor(admin, check_grpc_header));
   let grpc_routes = grpc_builder.routes().into_axum_router();
-  //let grpc_routes = Router::new().route("/grpc", (grpc_routes1)); //merged route
+  //TODO: add tonic-web: see in aarchive
 
   let cors_layer = CorsLayer::new()
     .allow_methods(Any)
