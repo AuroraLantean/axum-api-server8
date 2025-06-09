@@ -214,7 +214,6 @@ fn router(app_state: Arc<AppState>) -> Router {
     .route("/resp_output/{id}", get(resp_output))
     .route("/custom_extractor", post(custom_extractor))
     .route("/custom_extractor2", post(custom_extractor2))
-    .route("/internal_error", get(internal_error))
     .route(
       "/add_middleware_data",
       get(middleware_data_handler).route_layer(from_fn(add_middleware_data)),

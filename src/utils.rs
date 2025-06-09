@@ -36,6 +36,7 @@ impl IntoResponse for DbErrOut {
     Response::new(Body::from(res))
   }
 }
+// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into `Result<_, AppError>`. That way you don't need to do that manually.
 impl<E> From<E> for DbErrOut
 where
   E: Into<DbErr>,

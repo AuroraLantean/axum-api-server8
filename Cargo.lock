@@ -345,7 +345,6 @@ dependencies = [
 name = "axum-postgresql-8a"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-graphql",
  "async-graphql-axum",
  "axum",
@@ -370,7 +369,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

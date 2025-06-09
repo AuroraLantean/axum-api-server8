@@ -183,6 +183,11 @@ pub async fn post_raw1() -> Response {
   //(StatusCode::CREATED, "New Post Added!")
 } //[("Content-Type":"application/json")], r#"{"name":"john"}"#,
 
+#[derive(Debug, Serialize, Clone)]
+pub struct Error {
+  code: u64, // Uuid,
+  mesg: String,
+}
 pub async fn custom_extractor(Json(value): Json<Value>) -> (StatusCode, Json<Error>) {
   println!("value: {:?}", value);
   let err = Error {
@@ -202,43 +207,6 @@ pub async fn custom_extractor2(Json(value): Json<Value>) -> impl IntoResponse {
   println!("err: {:?}", payload);
   Json(payload)
   //Json(dbg!(value));
-}
-
-//----------------== Error ;;;
-#[derive(Debug, Serialize, Clone)]
-pub struct Error {
-  code: u64, // Uuid,
-  mesg: String,
-}
-
-pub async fn internal_error() -> Result<(), AppError> {
-  try_thing()?;
-  Ok(())
-}
-fn try_thing() -> Result<(), anyhow::Error> {
-  anyhow::bail!("it failed!")
-}
-// Make our own error that wraps `anyhow::Error`.
-pub struct AppError(anyhow::Error);
-
-// Tell axum how to convert `AppError` into a response.
-impl IntoResponse for AppError {
-  fn into_response(self) -> Response {
-    (
-      StatusCode::INTERNAL_SERVER_ERROR,
-      format!("internal error: {}", self.0),
-    )
-      .into_response()
-  }
-}
-// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into `Result<_, AppError>`. That way you don't need to do that manually.
-impl<E> From<E> for AppError
-where
-  E: Into<anyhow::Error>,
-{
-  fn from(err: E) -> Self {
-    Self(err.into())
-  }
 }
 
 //---------------== Session Handler
