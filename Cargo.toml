@@ -37,9 +37,10 @@ axum_session_sqlx = { version = "0.5.0", features = ["sqlite", "tls-rustls"] }
 axum_session = "0.16.0"
 tower-http = { version = "0.6.6", features = ["cors", "fs"] }
 
-postgres = "0.19.10"
 prost = "0.13.5"
 tonic = { version = "0.13.1", features = ["router"] }
+tonic-reflection = "0.13.1"
+
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 async-graphql = "7.0.17"

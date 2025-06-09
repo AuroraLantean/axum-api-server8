@@ -42,6 +42,9 @@ See JWT example to make your own error
 //import compiled protobuf. The name must match the package name in your .proto file
 mod proto {
   tonic::include_proto!("calculator");
+
+  pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
+    tonic::include_file_descriptor_set!("calculator_descriptor");
 }
 #[derive(Debug, Default)]
 struct CalculatorService {}
@@ -102,9 +105,15 @@ async fn main() {
 
   let calculator = CalculatorServer::new(CalculatorService::default());
 
+  let reflection_service = tonic_reflection::server::Builder::configure()
+    .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
+    .build_v1()
+    .unwrap();
+
+  //https://docs.rs/tonic/latest/tonic/service/struct.Routes.html
   let mut grpc_builder = Routes::builder();
   grpc_builder.add_service(calculator);
-  //grpc_builder.add_service(reflection_service);
+  grpc_builder.add_service(reflection_service);
   let grpc_routes = grpc_builder.routes().into_axum_router();
   //let grpc_routes = Router::new().route("/grpc", (grpc_routes1)); //merged route
 

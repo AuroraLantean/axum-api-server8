@@ -357,7 +357,6 @@ dependencies = [
  "dotenvy",
  "jsonwebtoken",
  "log",
- "postgres",
  "prost",
  "sea-orm",
  "serde",
@@ -367,6 +366,7 @@ dependencies = [
  "tokio-postgres",
  "tonic",
  "tonic-build",
+ "tonic-reflection",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -2131,20 +2131,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "postgres"
-version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "363e6dfbdd780d3aa3597b6eb430db76bb315fa9bad7fae595bb8def808b8470"
-dependencies = [
- "bytes",
- "fallible-iterator",
- "futures-util",
- "log",
- "tokio",
- "tokio-postgres",
-]
-
-[[package]]
 name = "postgres-protocol"
 version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3503,6 +3489,19 @@ dependencies = [
  "prost-types",
  "quote",
  "syn 2.0.101",
+]
+
+[[package]]
+name = "tonic-reflection"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9687bd5bfeafebdded2356950f278bba8226f0b32109537c4253406e09aafe1"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]
