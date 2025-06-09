@@ -4,6 +4,7 @@ package calculator;
 
 service Calculator {
   rpc Add(CalculationRequest) returns (CalculationResponse);
+  rpc Divide(CalculationRequest) returns (CalculationResponse);
 }
 
 message CalculationRequest {
@@ -11,3 +12,9 @@ message CalculationRequest {
   int64 b = 2;
 }
 message CalculationResponse { int64 result = 1; }
+
+service Admin {
+  rpc GetCount(CountRequest) returns (CountResponse);
+}
+message CountRequest {}
+message CountResponse { uint64 count = 1; }

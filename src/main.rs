@@ -10,7 +10,11 @@ use axum::{
   routing::{delete, get, post},
 };
 //import generated trait containing gRPC methods that should be implemented for use with CalculatorServer
-use proto::calculator_server::{Calculator, CalculatorServer};
+use crate::grpc::{
+  AdminService, CalculatorService, GrpcState,
+  proto::{self, admin_server::AdminServer},
+};
+use proto::calculator_server::CalculatorServer;
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
@@ -31,38 +35,15 @@ use users::*;
 mod graphql;
 use graphql::*;
 mod entities;
+mod grpc;
 mod utils;
-
 /*In axum 0.8 changes
   :id  => {id}
 
 TODO: see example at Axum examples/anyhow for errors, and error-handling ...
 See JWT example to make your own error
 */
-//import compiled protobuf. The name must match the package name in your .proto file
-mod proto {
-  tonic::include_proto!("calculator");
 
-  pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-    tonic::include_file_descriptor_set!("calculator_descriptor");
-}
-#[derive(Debug, Default)]
-struct CalculatorService {}
-#[tonic::async_trait]
-impl Calculator for CalculatorService {
-  async fn add(
-    &self,
-    request: tonic::Request<proto::CalculationRequest>,
-  ) -> Result<tonic::Response<proto::CalculationResponse>, tonic::Status> {
-    println!("request: {:?}", request);
-    let input = request.get_ref();
-    let response = proto::CalculationResponse {
-      result: input.a + input.b,
-    };
-    let res = tonic::Response::new(response);
-    Ok(res)
-  }
-}
 //DO NOT SERIALIZE/DESERIALIZE AppSTATE!
 //#[derive(Clone, FromRef)]
 pub struct AppState {
@@ -70,13 +51,7 @@ pub struct AppState {
   msg: String,
   num: i32,
 }
-/*impl {
-  pub fn new(pool: DatabaseConnection) -> Self {
-    Self {
-      store: Store::new(pool)
-    }
-  }
-}*/
+
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -103,7 +78,16 @@ async fn main() {
     num: 0,
   }));
 
-  let calculator = CalculatorServer::new(CalculatorService::default());
+  //make gRPC services share the same state
+  let state = GrpcState::default();
+  let calc = CalculatorService {
+    state: state.clone(),
+  };
+  let admin = AdminService {
+    state: state.clone(),
+  };
+  //let calculator = CalculatorService::default();
+  //let admin = AdminService::default();
 
   let reflection_service = tonic_reflection::server::Builder::configure()
     .register_encoded_file_descriptor_set(proto::FILE_DESCRIPTOR_SET)
@@ -112,8 +96,9 @@ async fn main() {
 
   //https://docs.rs/tonic/latest/tonic/service/struct.Routes.html
   let mut grpc_builder = Routes::builder();
-  grpc_builder.add_service(calculator);
   grpc_builder.add_service(reflection_service);
+  grpc_builder.add_service(CalculatorServer::new(calc));
+  grpc_builder.add_service(AdminServer::new(admin));
   let grpc_routes = grpc_builder.routes().into_axum_router();
   //let grpc_routes = Router::new().route("/grpc", (grpc_routes1)); //merged route
 
