@@ -111,6 +111,17 @@ SeaORM https://github.com/SeaQL/sea-orm
 
 Tokio https://github.com/tokio-rs/axum
 
+Tonic for gRPC
+https://github.com/hyperium/tonic
+
+Prost is a Protocol Buffers implementation for the Rust Language. https://github.com/tokio-rs/prost
+
+gRPC UI is a command-line tool that lets you interact with gRPC servers via a browser. sort of like Postman, but for gRPC APIs instead of REST.
+https://github.com/fullstorydev/grpcui
+to install: `brew install grpcui`
+
+grpcurl: Like cURL, but for gRPC: Command-line tool for interacting with gRPC servers
+https://github.com/fullstorydev/grpcurl
 
 ## Installation
 install terminator
@@ -122,6 +133,10 @@ install just command runner
 install Rust 1.87.0 (17067e9ac 2025-05-09)
 
 install cargo-watch: `cargo install cargo-watch`
+
+install protobuf: https://protobuf.dev/installation/
+
+install gRPCurl: https://github.com/fullstorydev/grpcurl/releases
 
 ## Run
 Start Terminator: `just term`

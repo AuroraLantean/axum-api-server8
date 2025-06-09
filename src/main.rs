@@ -9,9 +9,12 @@ use axum::{
   middleware::{from_fn, from_fn_with_state},
   routing::{delete, get, post},
 };
+//import generated trait containing gRPC methods that should be implemented for use with CalculatorServer
+use proto::calculator_server::{Calculator, CalculatorServer};
 use sea_orm::DatabaseConnection;
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
+use tonic::service::Routes;
 use tower_http::{
   cors::{Any, CorsLayer},
   services::ServeDir,
@@ -36,12 +39,41 @@ mod utils;
 TODO: see example at Axum examples/anyhow for errors, and error-handling ...
 See JWT example to make your own error
 */
+//import compiled protobuf. The name must match the package name in your .proto file
+mod proto {
+  tonic::include_proto!("calculator");
+}
+#[derive(Debug, Default)]
+struct CalculatorService {}
+#[tonic::async_trait]
+impl Calculator for CalculatorService {
+  async fn add(
+    &self,
+    request: tonic::Request<proto::CalculationRequest>,
+  ) -> Result<tonic::Response<proto::CalculationResponse>, tonic::Status> {
+    println!("request: {:?}", request);
+    let input = request.get_ref();
+    let response = proto::CalculationResponse {
+      result: input.a + input.b,
+    };
+    let res = tonic::Response::new(response);
+    Ok(res)
+  }
+}
 //DO NOT SERIALIZE/DESERIALIZE AppSTATE!
+//#[derive(Clone, FromRef)]
 pub struct AppState {
   dbp: DatabaseConnection,
   msg: String,
   num: i32,
 }
+/*impl {
+  pub fn new(pool: DatabaseConnection) -> Self {
+    Self {
+      store: Store::new(pool)
+    }
+  }
+}*/
 #[tokio::main]
 async fn main() {
   tracing_subscriber::fmt()
@@ -62,11 +94,29 @@ async fn main() {
   //let pool = tokio_postgres1().await;
   //let pool = sqlx_postgres1().await;
   //routes = router(pool)
-  let routes = router(Arc::new(AppState {
+  let rest_routes = router(Arc::new(AppState {
     dbp: pool.clone(),
     msg: "msg".to_owned(),
     num: 0,
   }));
+
+  let calculator = CalculatorServer::new(CalculatorService::default());
+
+  let mut grpc_builder = Routes::builder();
+  grpc_builder.add_service(calculator);
+  //grpc_builder.add_service(reflection_service);
+  let grpc_routes = grpc_builder.routes().into_axum_router();
+  //let grpc_routes = Router::new().route("/grpc", (grpc_routes1)); //merged route
+
+  let cors_layer = CorsLayer::new()
+    .allow_methods(Any)
+    .allow_headers([CONTENT_TYPE, AUTHORIZATION, ACCEPT])
+    .allow_origin("http://localhost:4000".parse::<HeaderValue>().unwrap());
+  //allow_method: [Method::GET, Method::POST]
+  //allow)credentials(true)
+
+  let routes = rest_routes.merge(grpc_routes).layer(cors_layer);
+
   axum::serve(listener, routes).await.unwrap();
 }
 
@@ -83,13 +133,6 @@ struct SharedUser {
 
 fn router(app_state: Arc<AppState>) -> Router {
   //pool: DatabaseConnection
-  let cors_layer = CorsLayer::new()
-    .allow_methods(Any)
-    .allow_headers([CONTENT_TYPE, AUTHORIZATION, ACCEPT])
-    .allow_origin("http://localhost:4000".parse::<HeaderValue>().unwrap());
-  //allow_method: [Method::GET, Method::POST]
-  //allow)credentials(true)
-
   let static_files = ServeDir::new("./assets"); // localhost:3000/static/bitcoin.jpg
   let arc_shared_state_mut = Arc::new(Mutex::new(SharedState {
     mesg: "arc_sharedState_mut".to_owned(),
@@ -169,6 +212,9 @@ fn router(app_state: Arc<AppState>) -> Router {
     )
     .nest("/user", user_router)
     .nest_service("/static", static_files)
+    //.add_service(calculator)
+    //.nest_service("/calculator", calculator)
+    //.into_axum_router()
     .route("/wildcard/{*rest}", get(wildcard_handler))
     .route("/uri/xyz", get(uri_handler))
     .route("/contact_form", post(contact_form_handler))
@@ -177,7 +223,7 @@ fn router(app_state: Arc<AppState>) -> Router {
       get(graphql_handler).post_service(GraphQL::new(schema)),
     )
     .merge(route1)
-    .fallback(fallback_handler)
+    //.fallback(fallback_handler)
     .layer(from_fn(middleware_general))
     .with_state(app_state)
     .route("/get_state_in_handler", get(get_state_handler))
@@ -187,7 +233,7 @@ fn router(app_state: Arc<AppState>) -> Router {
       get(get_mut_shared_state_handler).post(post_mut_shared_state_handler),
     )
     .with_state(arc_shared_state_mut)
-    .layer(cors_layer)
+  //.layer(cors_layer)
 
   /*.with_state() will cause all routes above it to receive that state. So you can have multiple states like:
   .route().with_state(client_in_arc)

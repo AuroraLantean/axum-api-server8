@@ -131,7 +131,7 @@ pub async fn post_mut_shared_state_handler(
 pub async fn redirect_handler() -> impl IntoResponse {
   Redirect::to("/text")
 }
-pub async fn fallback_handler() -> impl IntoResponse {
+pub async fn _fallback_handler() -> impl IntoResponse {
   (StatusCode::NOT_FOUND, "404 | Not Found")
 }
 pub async fn user_profile() -> impl IntoResponse {
